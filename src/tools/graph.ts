@@ -8,7 +8,6 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { StoryStore } from '../story-store.js';
 import { buildLinkGraph } from '../story-store.js';
 import {
-  bfsVisited,
   findCycles,
   reachableFrom,
   shortestPath,

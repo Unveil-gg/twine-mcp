@@ -1,13 +1,22 @@
 <p align="center">
-  <img src="assets/logo.png" alt="Twine MCP logo: a stylized blue-to-green gradient branching tree ending in a sparkle icon" width="160" />
+  <img src="assets/twine-mcp-logo.png" alt="Twine MCP logo: a stylized blue-to-green gradient branching tree ending in a sparkle icon" width="160" />
 </p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/@unveil-gg/twine-mcp">
     <img src="https://img.shields.io/npm/v/@unveil-gg/twine-mcp.svg?style=flat-square" alt="npm version" />
   </a>
-  <a href="https://github.com/Unveil-gg/twine-mcp/actions/workflows/publish.yml">
-    <img src="https://github.com/Unveil-gg/twine-mcp/actions/workflows/publish.yml/badge.svg" alt="build" />
+  <a href="https://github.com/Unveil-gg/twine-mcp/actions/workflows/ci.yml">
+    <img src="https://github.com/Unveil-gg/twine-mcp/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" />
+  </a>
+  <a href="https://www.npmjs.com/package/@unveil-gg/twine-mcp">
+    <img src="https://img.shields.io/npm/l/@unveil-gg/twine-mcp.svg?style=flat-square" alt="license" />
+  </a>
+  <a href="https://www.npmjs.com/package/@unveil-gg/twine-mcp">
+    <img src="https://img.shields.io/npm/dm/@unveil-gg/twine-mcp.svg?style=flat-square" alt="npm downloads" />
+  </a>
+  <a href="https://modelcontextprotocol.io">
+    <img src="https://img.shields.io/badge/MCP-compatible-8B5CF6?style=flat-square" alt="MCP compatible" />
   </a>
 </p>
 

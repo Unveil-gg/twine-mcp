@@ -6,7 +6,7 @@
 import * as z from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { parseTwine2HTML, Story } from 'extwee';
-import { StoryStore, toFull, buildLinkGraph } from '../story-store.js';
+import { StoryStore } from '../story-store.js';
 
 /**
  * Registers all story-management tools on the MCP server.

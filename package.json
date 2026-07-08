@@ -20,6 +20,7 @@
     "dev": "tsc --watch",
     "start": "node dist/server.js",
     "setup": "node dist/server.js setup",
+    "lint": "eslint src",
     "test": "vitest run",
     "prepublishOnly": "npm run build"
   },
@@ -42,9 +43,12 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.0.0",
     "@types/uuid": "^10.0.0",
+    "eslint": "^10.6.0",
     "typescript": "^5.7.0",
+    "typescript-eslint": "^8.63.0",
     "vitest": "^3.0.0"
   },
   "engines": {
