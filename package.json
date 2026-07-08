@@ -1,5 +1,5 @@
 {
-  "name": "twine-mcp",
+  "name": "@unveil/twine-mcp",
   "version": "0.1.0",
   "description": "MCP server for Twine interactive story authoring",
   "type": "module",
@@ -7,12 +7,34 @@
   "bin": {
     "twine-mcp": "dist/server.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/server.js",
-    "test": "vitest run"
+    "setup": "node dist/server.js setup",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
   },
+  "keywords": [
+    "twine",
+    "mcp",
+    "interactive-fiction",
+    "ai",
+    "model-context-protocol"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/unveil/twine-mcp"
+  },
+  "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
     "chokidar": "^4.0.3",

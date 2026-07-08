@@ -5,9 +5,17 @@
  * Transport: stdio (default for Cursor, Claude Desktop, VS Code)
  *
  * Startup:
- *   npx twine-mcp
- *   TWINE_LIBRARY=/path/to/stories npx twine-mcp
+ *   npx @unveil/twine-mcp
+ *   twine-mcp setup              ← interactive first-run wizard
+ *   TWINE_LIBRARY=/path/to/stories twine-mcp
  */
+
+// Route the `setup` subcommand before importing the heavy MCP SDK.
+if (process.argv[2] === 'setup') {
+  const { runSetup } = await import('./cli/setup.js');
+  await runSetup();
+  process.exit(0);
+}
 
 import { McpServer, ResourceTemplate } from
   '@modelcontextprotocol/sdk/server/mcp.js';

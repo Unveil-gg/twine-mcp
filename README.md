@@ -1,66 +1,82 @@
-# twine-mcp
+# @unveil/twine-mcp
 
 A locally-run MCP server for [Twine](https://twinery.org/) interactive story authoring.
 
-Connects to Twine's story library on the file system and exposes tools for story management, passage CRUD, link-graph analysis, plot consistency checking, and AI-optimized narrative intelligence — all callable from Cursor, Claude Desktop, or any MCP-compatible AI client.
+Connects to Twine's story library on the file system and exposes tools for story management, passage CRUD, link-graph analysis, plot consistency checking, and AI-optimized narrative intelligence — all callable from Cursor, Claude Code, Claude Desktop, Codex CLI, or any MCP-compatible AI client.
 
 ---
 
 ## Quick start
 
 ```bash
-# Option A: zero-install
-npx twine-mcp
+# Install globally (recommended)
+npm install -g @unveil/twine-mcp
 
-# Option B: global install
-npm install -g twine-mcp
-twine-mcp
-
-# Custom library path
-TWINE_LIBRARY="C:/Users/you/Documents/Twine/Stories" npx twine-mcp
+# Run the interactive setup wizard
+twine-mcp setup
 ```
 
-The server auto-discovers your Twine story library from:
+The wizard auto-detects your Twine story library, asks which editor you use, and writes (or copies) the config block for you — **no manual JSON editing needed**.
+
+The server auto-discovers your library from:
 1. `TWINE_LIBRARY` environment variable
-2. Electron `app-prefs.json` (reads `storyLibraryFolderPath`)
+2. Twine's Electron `app-prefs.json` (`storyLibraryFolderPath`)
 3. OS default: `~/Documents/Twine/Stories`
 
 ---
 
-## Cursor setup
+## Editor setup
 
-Add to your `.cursor/mcp.json` (or user-level MCP config):
+> **Recommended:** run `twine-mcp setup` after installing — it handles all of the steps below automatically.
+
+The config block is the same for every editor (swap the path for your OS):
 
 ```json
 {
   "mcpServers": {
     "twine": {
-      "command": "npx",
-      "args": ["twine-mcp"],
+      "command": "twine-mcp",
       "env": {
-        "TWINE_LIBRARY": "C:/Users/yourname/Documents/Twine/Stories"
+        "TWINE_LIBRARY": "/Users/yourname/Documents/Twine/Stories"
       }
     }
   }
 }
 ```
 
----
+### Cursor
 
-## Claude Desktop setup
+File: `~/.cursor/mcp.json`
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+Add the block above (or run `twine-mcp setup` → select **Cursor**). Restart Cursor (or reload the MCP panel) when done.
 
-```json
-{
-  "mcpServers": {
-    "twine": {
-      "command": "npx",
-      "args": ["twine-mcp"]
-    }
-  }
-}
+### Claude Code
+
+File: `~/.claude.json`
+
+Add the `mcpServers` block above, or run:
+
+```bash
+twine-mcp setup   # select Claude Code → Auto
 ```
+
+Claude Code reloads MCP config automatically on next invocation.
+
+### Claude Desktop
+
+| OS | Config file |
+|----|-------------|
+| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
+| Linux | `~/.config/claude/claude_desktop_config.json` |
+
+Add the block above and restart Claude Desktop.
+
+### Codex CLI
+
+File: `~/.codex/config.json`
+
+Add the `mcpServers` block above. Codex picks it up on the next session start.
 
 ---
 
@@ -189,12 +205,13 @@ twine-mcp watches `~/Documents/Twine/Stories/*.html` with [chokidar](https://git
 ## Development
 
 ```bash
-git clone <repo>
-cd twine-mcp
+git clone https://github.com/unveil/twine-mcp
+cd twine-mcp/twine-mcp
 npm install
-npm run build        # compile TypeScript
-npm start            # run server
-npm test             # run tests (vitest)
+npm run build        # compile TypeScript → dist/
+npm start            # run MCP server (stdio)
+node dist/server.js setup   # run setup wizard
+npm test             # vitest
 ```
 
 ---
