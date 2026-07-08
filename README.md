@@ -3,15 +3,7 @@
 </p>
 
 <p align="center">
-  <table>
-    <tr>
-      <td align="center"><a href="https://www.npmjs.com/package/@unveil-gg/twine-mcp"><img src="https://img.shields.io/npm/v/@unveil-gg/twine-mcp.svg?style=flat-square" alt="npm version"/></a></td>
-      <td align="center"><a href="https://github.com/Unveil-gg/twine-mcp/actions/workflows/ci.yml"><img src="https://github.com/Unveil-gg/twine-mcp/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"/></a></td>
-      <td align="center"><a href="https://www.npmjs.com/package/@unveil-gg/twine-mcp"><img src="https://img.shields.io/npm/l/@unveil-gg/twine-mcp.svg?style=flat-square" alt="license"/></a></td>
-      <td align="center"><a href="https://www.npmjs.com/package/@unveil-gg/twine-mcp"><img src="https://img.shields.io/npm/dm/@unveil-gg/twine-mcp.svg?style=flat-square" alt="npm downloads"/></a></td>
-      <td align="center"><a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-compatible-8B5CF6?style=flat-square" alt="MCP compatible"/></a></td>
-    </tr>
-  </table>
+<a href="https://www.npmjs.com/package/@unveil-gg/twine-mcp"><img src="https://img.shields.io/npm/v/@unveil-gg/twine-mcp.svg?style=flat-square" alt="npm version" hspace="3"/></a><a href="https://github.com/Unveil-gg/twine-mcp/actions/workflows/ci.yml"><img src="https://github.com/Unveil-gg/twine-mcp/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" hspace="3"/></a><a href="https://www.npmjs.com/package/@unveil-gg/twine-mcp"><img src="https://img.shields.io/npm/l/@unveil-gg/twine-mcp.svg?style=flat-square" alt="license" hspace="3"/></a><a href="https://www.npmjs.com/package/@unveil-gg/twine-mcp"><img src="https://img.shields.io/npm/dm/@unveil-gg/twine-mcp.svg?style=flat-square" alt="npm downloads" hspace="3"/></a><a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-compatible-8B5CF6?style=flat-square" alt="MCP compatible" hspace="3"/></a>
 </p>
 
 # @unveil-gg/twine-mcp
