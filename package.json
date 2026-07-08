@@ -1,6 +1,6 @@
 {
   "name": "@unveil-gg/twine-mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "MCP server for Twine interactive story authoring",
   "type": "module",
   "main": "dist/server.js",
