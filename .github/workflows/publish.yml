@@ -1,0 +1,84 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  publish:
+    name: Build, test, and publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate tag matches package.json version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          EXPECTED="v${PKG_VERSION}"
+          if [ "$TAG" != "$EXPECTED" ]; then
+            echo "::error::Tag '$TAG' does not match package.json version '$PKG_VERSION' (expected '$EXPECTED')"
+            exit 1
+          fi
+          echo "Tag $TAG matches package.json version $PKG_VERSION"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  notify-failure:
+    name: Open issue on publish failure
+    runs-on: ubuntu-latest
+    needs: publish
+    if: failure()
+    steps:
+      - name: Create GitHub issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = context.ref.replace('refs/tags/', '');
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const title = `npm publish failed for ${tag}`;
+            const body = [
+              'The npm publish workflow failed.',
+              '',
+              `- Tag: \`${tag}\``,
+              `- Workflow run: ${runUrl}`,
+              `- Commit: \`${context.sha}\``,
+              '',
+              'Check the workflow logs for details. Common causes:',
+              '- Tag does not match \`package.json\` version',
+              '- Version already published to npm',
+              '- Build or test failure',
+              '- Invalid or expired \`NPM_TOKEN\` secret',
+            ].join('\n');
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+            });
