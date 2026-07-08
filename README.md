@@ -205,8 +205,8 @@ twine-mcp watches `~/Documents/Twine/Stories/*.html` with [chokidar](https://git
 ## Development
 
 ```bash
-git clone https://github.com/unveil/twine-mcp
-cd twine-mcp/twine-mcp
+git clone https://github.com/Unveil-gg/twine-mcp
+cd twine-mcp
 npm install
 npm run build        # compile TypeScript → dist/
 npm start            # run MCP server (stdio)
