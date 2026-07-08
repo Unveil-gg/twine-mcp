@@ -1,4 +1,4 @@
-# @unveil/twine-mcp
+# @unveil-gg/twine-mcp
 
 A locally-run MCP server for [Twine](https://twinery.org/) interactive story authoring.
 
@@ -10,7 +10,7 @@ Connects to Twine's story library on the file system and exposes tools for story
 
 ```bash
 # Install globally (recommended)
-npm install -g @unveil/twine-mcp
+npm install -g @unveil-gg/twine-mcp
 
 # Run the interactive setup wizard
 twine-mcp setup

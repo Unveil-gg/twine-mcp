@@ -5,7 +5,7 @@
  * Transport: stdio (default for Cursor, Claude Desktop, VS Code)
  *
  * Startup:
- *   npx @unveil/twine-mcp
+ *   npx @unveil-gg/twine-mcp
  *   twine-mcp setup              ← interactive first-run wizard
  *   TWINE_LIBRARY=/path/to/stories twine-mcp
  */

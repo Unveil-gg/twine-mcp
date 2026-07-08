@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Interactive setup CLI for @unveil/twine-mcp.
+ * Interactive setup CLI for @unveil-gg/twine-mcp.
  * Usage: twine-mcp setup
  */
 
@@ -283,6 +283,6 @@ export async function runSetup(): Promise<void> {
       `Your editor will auto-start ${cyan('twine-mcp')} on next launch.`,
   );
   console.log(
-    `  ${dim('Or start it manually with:')} ${cyan('npx @unveil/twine-mcp')}\n`,
+    `  ${dim('Or start it manually with:')} ${cyan('npx @unveil-gg/twine-mcp')}\n`,
   );
 }
