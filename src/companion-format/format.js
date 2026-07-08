@@ -99,10 +99,10 @@ window.storyFormat({
     }
 
     // MCP ping (fire-and-forget, best-effort)
-    var badge = document.getElementById('mcp-badge');
+    const badge = document.getElementById('mcp-badge');
     // The MCP server doesn't expose HTTP, so we can only show static guidance.
     // Update badge based on localStorage hint set by a helper page if desired.
-    var hint = localStorage.getItem('twine-mcp-status');
+    const hint = localStorage.getItem('twine-mcp-status');
     if (hint === 'connected') {
       badge.textContent = 'MCP: Connected';
       badge.className = 'mcp-badge connected';

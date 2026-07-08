@@ -66,8 +66,14 @@ async function selectMenu(
         process.exit(1);
       }
       switch (key.name) {
-        case 'up':   idx = (idx - 1 + options.length) % options.length; render(); break;
-        case 'down': idx = (idx + 1) % options.length; render(); break;
+        case 'up':
+          idx = (idx - 1 + options.length) % options.length;
+          render();
+          break;
+        case 'down':
+          idx = (idx + 1) % options.length;
+          render();
+          break;
         case 'return':
           if (stdin.isTTY) stdin.setRawMode(false);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any

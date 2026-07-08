@@ -168,7 +168,7 @@ export function registerStoryTools(
     },
   );
 
-  /** get_link_graph (convenience alias at story level) */
+  /** compile_story */
   server.registerTool(
     'compile_story',
     {
@@ -232,6 +232,12 @@ export function err(message: string) {
   };
 }
 
+/**
+ * Escapes HTML special characters to produce safe HTML output.
+ *
+ * @param s - Raw string to escape
+ * @returns HTML-safe string with &, <, >, " replaced by entities
+ */
 function escHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
