@@ -3,21 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/@unveil-gg/twine-mcp">
-    <img src="https://img.shields.io/npm/v/@unveil-gg/twine-mcp.svg?style=flat-square" alt="npm version" />
-  </a>
-  <a href="https://github.com/Unveil-gg/twine-mcp/actions/workflows/ci.yml">
-    <img src="https://github.com/Unveil-gg/twine-mcp/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" />
-  </a>
-  <a href="https://www.npmjs.com/package/@unveil-gg/twine-mcp">
-    <img src="https://img.shields.io/npm/l/@unveil-gg/twine-mcp.svg?style=flat-square" alt="license" />
-  </a>
-  <a href="https://www.npmjs.com/package/@unveil-gg/twine-mcp">
-    <img src="https://img.shields.io/npm/dm/@unveil-gg/twine-mcp.svg?style=flat-square" alt="npm downloads" />
-  </a>
-  <a href="https://modelcontextprotocol.io">
-    <img src="https://img.shields.io/badge/MCP-compatible-8B5CF6?style=flat-square" alt="MCP compatible" />
-  </a>
+  <a href="https://www.npmjs.com/package/@unveil-gg/twine-mcp" style="text-decoration: none;"><img src="https://img.shields.io/npm/v/@unveil-gg/twine-mcp.svg?style=flat-square" alt="npm version" /></a><a href="https://github.com/Unveil-gg/twine-mcp/actions/workflows/ci.yml" style="text-decoration: none;"><img src="https://github.com/Unveil-gg/twine-mcp/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" /></a><a href="https://www.npmjs.com/package/@unveil-gg/twine-mcp" style="text-decoration: none;"><img src="https://img.shields.io/npm/l/@unveil-gg/twine-mcp.svg?style=flat-square" alt="license" /></a><a href="https://www.npmjs.com/package/@unveil-gg/twine-mcp" style="text-decoration: none;"><img src="https://img.shields.io/npm/dm/@unveil-gg/twine-mcp.svg?style=flat-square" alt="npm downloads" /></a><a href="https://modelcontextprotocol.io" style="text-decoration: none;"><img src="https://img.shields.io/badge/MCP-compatible-8B5CF6?style=flat-square" alt="MCP compatible" /></a>
 </p>
 
 # @unveil-gg/twine-mcp
@@ -28,7 +14,7 @@ Works with **Cursor**, **Claude Code**, **Claude Desktop**, and **Codex CLI**.
 
 ---
 
-## Setup (2 commands)
+## Setup
 
 ```bash
 npm install -g @unveil-gg/twine-mcp
