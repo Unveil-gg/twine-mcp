@@ -1,3 +1,16 @@
+<p align="center">
+  <img src="assets/logo.png" alt="Twine MCP logo: a stylized blue-to-green gradient branching tree ending in a sparkle icon" width="160" />
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/@unveil-gg/twine-mcp">
+    <img src="https://img.shields.io/npm/v/@unveil-gg/twine-mcp.svg?style=flat-square" alt="npm version" />
+  </a>
+  <a href="https://github.com/Unveil-gg/twine-mcp/actions/workflows/publish.yml">
+    <img src="https://github.com/Unveil-gg/twine-mcp/actions/workflows/publish.yml/badge.svg" alt="build" />
+  </a>
+</p>
+
 # @unveil-gg/twine-mcp
 
 MCP server for [Twine](https://twinery.org/) interactive story authoring. Connects to your Twine story library and gives AI tools for passage editing, link-graph analysis, plot consistency checks, and narrative intelligence.
