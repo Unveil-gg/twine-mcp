@@ -3,10 +3,12 @@
 </p>
 
 <p align="center">
-<a href="https://www.npmjs.com/package/@unveil-gg/twine-mcp"><img src="https://img.shields.io/npm/v/@unveil-gg/twine-mcp.svg?style=flat-square" alt="npm version" hspace="3"/></a><a href="https://github.com/Unveil-gg/twine-mcp/actions/workflows/ci.yml"><img src="https://github.com/Unveil-gg/twine-mcp/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" hspace="3"/></a><a href="https://www.npmjs.com/package/@unveil-gg/twine-mcp"><img src="https://img.shields.io/npm/l/@unveil-gg/twine-mcp.svg?style=flat-square" alt="license" hspace="3"/></a><a href="https://www.npmjs.com/package/@unveil-gg/twine-mcp"><img src="https://img.shields.io/npm/dm/@unveil-gg/twine-mcp.svg?style=flat-square" alt="npm downloads" hspace="3"/></a><a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-compatible-8B5CF6?style=flat-square" alt="MCP compatible" hspace="3"/></a>
+  <strong style="font-size: 1.75em">Twine MCP</strong>
 </p>
 
-# @unveil-gg/twine-mcp
+<p align="center">
+<a href="https://www.npmjs.com/package/@unveil-gg/twine-mcp"><img src="https://img.shields.io/npm/v/@unveil-gg/twine-mcp.svg?style=flat-square" alt="npm version" hspace="3"/></a><a href="https://github.com/Unveil-gg/twine-mcp/actions/workflows/ci.yml"><img src="https://github.com/Unveil-gg/twine-mcp/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" hspace="3"/></a><a href="https://www.npmjs.com/package/@unveil-gg/twine-mcp"><img src="https://img.shields.io/npm/l/@unveil-gg/twine-mcp.svg?style=flat-square" alt="license" hspace="3"/></a><a href="https://www.npmjs.com/package/@unveil-gg/twine-mcp"><img src="https://img.shields.io/npm/dm/@unveil-gg/twine-mcp.svg?style=flat-square" alt="npm downloads" hspace="3"/></a><a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-compatible-8B5CF6?style=flat-square" alt="MCP compatible" hspace="3"/></a>
+</p>
 
 MCP server for [Twine](https://twinery.org/) interactive story authoring. Connects to your Twine story library and gives AI tools for passage editing, link-graph analysis, plot consistency checks, and narrative intelligence.
 
