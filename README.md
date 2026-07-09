@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <strong style="font-size: 1.75em">Twine MCP</strong>
+  <strong style="font-size: 2.75em">Twine MCP</strong>
 </p>
 
 <p align="center">
