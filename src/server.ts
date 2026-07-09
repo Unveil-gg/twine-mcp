@@ -33,6 +33,7 @@ import { registerAnalysisVarTools } from './tools/analysis-vars.js';
 import { registerNarrativeTools } from './tools/narrative.js';
 import { registerNarrativeFlowTools } from './tools/narrative-flow.js';
 import { registerFormatTools } from './tools/formats.js';
+import { registerCssTools } from './tools/css.js';
 
 async function main(): Promise<void> {
   const libraryPath = resolveLibraryPath();
@@ -55,6 +56,7 @@ async function main(): Promise<void> {
   registerNarrativeTools(server, store);
   registerNarrativeFlowTools(server, store);
   registerFormatTools(server, store);
+  registerCssTools(server, store);
 
   // ── Utility tools ────────────────────────────────────────────────────────
 

@@ -55,10 +55,11 @@ The library path is auto-detected from Twine's settings or defaults to `~/Docume
 |----------|----------|
 | **Story management** | List, create, delete, export Twee, compile HTML |
 | **Passage CRUD** | Create, edit, rename passages (rewrites `[[links]]`) |
+| **CSS** | Read and write the stylesheet passage (format-aware) |
 | **Graph analysis** | Broken links, dead ends, orphans, cycles, path finding |
 | **Plot checking** | Full analysis report, variable usage, tag consistency |
 | **Narrative intelligence** | Story summary, branch map, endings audit — token-efficient for AI |
-| **Format awareness** | Harlowe, SugarCube, Chapbook syntax guides |
+| **Format awareness** | Harlowe, SugarCube, Chapbook, Snowman syntax guides |
 
 ### Recommended AI workflow
 
@@ -99,6 +100,16 @@ Start cheap (`summarize_story` ≈ 200 tokens), go deeper only when needed.
 | `delete_passage` | Remove a passage. |
 | `rename_passage` | Rename + rewrite all `[[links]]` pointing to old name. |
 | `set_start_passage` | Change the story starting passage. |
+
+</details>
+
+<details>
+<summary><strong>CSS</strong></summary>
+
+| Tool | Description |
+|------|-------------|
+| `get_stylesheet` | Read the CSS stylesheet passage. Returns content, passage name, and format convention. |
+| `update_stylesheet` | Write CSS to the stylesheet passage. Creates it if absent. Supports `replace` (default) and `append` modes. |
 
 </details>
 

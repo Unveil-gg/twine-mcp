@@ -1,5 +1,6 @@
 /**
- * Format-aware patterns for scanning variable set/read operations.
+ * Format-aware patterns for scanning variable set/read operations,
+ * and for locating the stylesheet passage by format.
  *
  * Each format entry contains:
  *   setPattern  - regex to find variable assignments
@@ -48,6 +49,44 @@ export const FORMAT_HINTS: Record<string, FormatHints> = {
 export function getFormatHints(formatName: string): FormatHints {
   const key = formatName.toLowerCase().replace(/\s+\d.*$/, '').trim();
   return FORMAT_HINTS[key] ?? FORMAT_HINTS['sugarcube'];
+}
+
+/**
+ * Describes how a story format stores its stylesheet passage.
+ * SugarCube uses a fixed name; all other formats use a tag.
+ */
+export interface StylesheetPassageInfo {
+  /** Canonical passage name to create when no stylesheet exists. */
+  name: string;
+  /**
+   * Tag the passage must carry, or null if lookup is by name only
+   * (SugarCube's StoryStyle).
+   */
+  tag: string | null;
+}
+
+/** Per-format stylesheet passage conventions. */
+const STYLESHEET_PASSAGE: Record<string, StylesheetPassageInfo> = {
+  sugarcube: { name: 'StoryStyle', tag: null },
+  harlowe: { name: 'Story Stylesheet', tag: 'stylesheet' },
+  chapbook: { name: 'Story Stylesheet', tag: 'stylesheet' },
+  snowman: { name: 'Story Stylesheet', tag: 'stylesheet' },
+};
+
+/**
+ * Returns the stylesheet passage convention for a format, defaulting
+ * to tag-based lookup for unknown formats.
+ *
+ * @param formatName - Story format name (e.g. "Harlowe", "SugarCube")
+ * @returns StylesheetPassageInfo describing how to find/create the passage
+ */
+export function getStylesheetPassage(
+  formatName: string,
+): StylesheetPassageInfo {
+  const key = formatName.toLowerCase().replace(/\s+\d.*$/, '').trim();
+  return (
+    STYLESHEET_PASSAGE[key] ?? { name: 'Story Stylesheet', tag: 'stylesheet' }
+  );
 }
 
 /** Static syntax guides keyed by format name (lowercase). */
