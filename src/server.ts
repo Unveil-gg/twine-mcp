@@ -2,28 +2,16 @@
 /**
  * twine-mcp — MCP server for Twine interactive story authoring.
  *
- * Transport: stdio (default for Cursor, Claude Desktop, VS Code)
- *
- * Modes:
- *   Library mode  (default): watches ~/Documents/Twine/Stories/*.html
- *   Project mode  (new):     reads/writes src/**\/*.twee in a Git project
+ * Transport: stdio (default for Cursor, Claude Code, Claude Desktop)
  *
  * Environment variables:
- *   TWINE_PROJECT=/path/to/project   → project mode
- *   TWINE_LIBRARY=/path/to/stories   → library mode with custom path
+ *   TWINE_PROJECT=/path/to/workspace  — required; workspace root that
+ *                                       contains one or more game projects.
  *
  * Usage:
  *   npx @unveil-gg/twine-mcp
- *   twine-mcp setup           ← interactive first-run wizard
- *   TWINE_PROJECT=/my/game twine-mcp
+ *   twine-mcp setup        ← interactive first-run wizard
  */
-
-// Route the `setup` subcommand before importing the heavy MCP SDK.
-if (process.argv[2] === 'setup') {
-  const { runSetup } = await import('./cli/setup.js');
-  await runSetup();
-  process.exit(0);
-}
 
 import { McpServer, ResourceTemplate } from
   '@modelcontextprotocol/sdk/server/mcp.js';
@@ -31,15 +19,9 @@ import { StdioServerTransport } from
   '@modelcontextprotocol/sdk/server/stdio.js';
 import * as z from 'zod/v4';
 
-import {
-  resolveLibraryPath,
-  ensureLibraryExists,
-  resolveProjectRoot,
-  getServerMode,
-} from './config.js';
-import { StoryStore, buildLinkGraph } from './story-store.js';
-import { ProjectStore } from './project-store.js';
-import type { IStoryStore } from './types.js';
+import { requireWorkspaceRoot } from './config.js';
+import { WorkspaceStore } from './workspace-store.js';
+import { buildLinkGraph } from './story-store.js';
 import { registerStoryTools, ok, err } from './tools/stories.js';
 import { registerPassageTools } from './tools/passages.js';
 import { registerGraphTools } from './tools/graph.js';
@@ -55,33 +37,38 @@ import { listCachedFormats } from './format-manager.js';
 import { VERSION } from './version.js';
 
 async function main(): Promise<void> {
-  const mode = getServerMode();
-  let store: IStoryStore;
-  let projectStore: ProjectStore | null = null;
-  let libraryPath = '';
+  // Route `setup` subcommand before starting the MCP server
+  if (process.argv[2] === 'setup') {
+    const { runSetup } = await import('./cli/setup.js');
+    await runSetup();
+    return;
+  }
 
-  if (mode === 'project') {
-    const projectRoot = resolveProjectRoot()!;
-    projectStore = new ProjectStore(projectRoot);
-    await projectStore.init();
-    store = projectStore;
+  let workspaceRoot: string;
+  try {
+    workspaceRoot = requireWorkspaceRoot();
+  } catch (e) {
+    process.stderr.write(`[twine-mcp] ${String(e)}\n`);
+    process.exit(1);
+  }
+
+  const store = new WorkspaceStore(workspaceRoot);
+  await store.init();
+
+  const games = store.listStories();
+  process.stderr.write(
+    `[twine-mcp] v${VERSION} — workspace: ${workspaceRoot} ` +
+    `(${games.length} game${games.length === 1 ? '' : 's'} found)\n`,
+  );
+  if (games.length > 0) {
     process.stderr.write(
-      `[twine-mcp] v${VERSION} — project mode. Root: ${projectRoot}\n`,
-    );
-  } else {
-    libraryPath = resolveLibraryPath();
-    ensureLibraryExists(libraryPath);
-    const storyStore = new StoryStore(libraryPath);
-    await storyStore.init();
-    store = storyStore;
-    process.stderr.write(
-      `[twine-mcp] v${VERSION} — library mode. Library: ${libraryPath}\n`,
+      `[twine-mcp] games: ${games.map((g) => g.name).join(', ')}\n`,
     );
   }
 
   const server = new McpServer({ name: 'twine-mcp', version: VERSION });
 
-  // ── Core tools (both modes) ──────────────────────────────────────────────
+  // ── Story / passage / analysis tools ────────────────────────────────────────
   registerStoryTools(server, store);
   registerPassageTools(server, store);
   registerGraphTools(server, store);
@@ -92,21 +79,17 @@ async function main(): Promise<void> {
   registerFormatTools(server, store);
   registerCssTools(server, store);
   registerRefactorTools(server, store);
+  registerProjectTools(server, store);
 
-  // ── Project-mode tools ───────────────────────────────────────────────────
-  if (projectStore) {
-    registerProjectTools(server, projectStore);
-  }
-
-  // ── Utility tools ────────────────────────────────────────────────────────
+  // ── Utility tools ────────────────────────────────────────────────────────────
 
   /** ping */
   server.registerTool(
     'ping',
     {
       description:
-        'Health check. Returns server version, operating mode, ' +
-        'and story/project info.',
+        'Health check. Returns server version, workspace path, and ' +
+        'the list of discovered game projects.',
       inputSchema: {},
     },
     async () => {
@@ -114,17 +97,12 @@ async function main(): Promise<void> {
       return ok({
         status: 'ok',
         version: VERSION,
-        mode,
-        ...(mode === 'project' && projectStore
-          ? {
-              projectRoot: projectStore.projectRoot,
-              storyName: stories[0]?.name ?? null,
-              passageCount: stories[0]?.passageCount ?? 0,
-            }
-          : {
-              libraryPath,
-              storyCount: stories.length,
-            }),
+        workspaceRoot,
+        games: stories.map((s) => ({
+          name: s.name,
+          passageCount: s.passageCount,
+          lastModified: s.lastModified,
+        })),
         cachedFormats: listCachedFormats(),
       });
     },
@@ -134,16 +112,13 @@ async function main(): Promise<void> {
   server.registerTool(
     'get_config',
     {
-      description: 'Return current server configuration and operating mode.',
+      description: 'Return current server configuration.',
       inputSchema: {},
     },
     async () =>
       ok({
         version: VERSION,
-        mode,
-        ...(mode === 'project' && projectStore
-          ? { projectRoot: projectStore.projectRoot }
-          : { libraryPath }),
+        workspaceRoot,
         platform: process.platform,
         nodeVersion: process.version,
         cachedFormats: listCachedFormats(),
@@ -156,8 +131,7 @@ async function main(): Promise<void> {
     {
       description:
         'Apply multiple passage updates to a story in a single atomic save. ' +
-        'Each update must specify a passage name. ' +
-        'Specify text, tags, or position to update each field.',
+        'Specify text, tags, or position for each passage.',
       inputSchema: {
         story: z.string().describe('Story name'),
         updates: z
@@ -198,12 +172,12 @@ async function main(): Promise<void> {
     },
   );
 
-  // ── MCP Resources ────────────────────────────────────────────────────────
+  // ── MCP Resources ─────────────────────────────────────────────────────────────
 
   server.resource(
     'stories',
     'twine://stories',
-    { description: 'All stories in the library or current project' },
+    { description: 'All discovered game projects in the workspace' },
     async () => ({
       contents: [{
         uri: 'twine://stories',
@@ -304,7 +278,7 @@ async function main(): Promise<void> {
     },
   );
 
-  // ── Start transport ──────────────────────────────────────────────────────
+  // ── Start transport ───────────────────────────────────────────────────────────
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }

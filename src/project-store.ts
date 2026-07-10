@@ -86,8 +86,13 @@ export class ProjectStore implements IStoryStore {
     this.srcDir = path.join(projectRoot, 'src');
   }
 
-  /** Scan src/ and build the merged in-memory story. */
+  /** Scan src/ and build the merged in-memory story (async wrapper). */
   async init(): Promise<void> {
+    this.loadProject();
+  }
+
+  /** Synchronously scan src/ and build the merged in-memory story. */
+  initSync(): void {
     this.loadProject();
   }
 

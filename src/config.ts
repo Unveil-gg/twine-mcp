@@ -1,108 +1,61 @@
 /**
- * Resolves the Twine story library path and project root from
- * environment variables, Electron app-prefs.json, or the OS default.
+ * Workspace root resolution for twine-mcp.
  *
- * Mode selection:
- *   TWINE_PROJECT=/path/to/project  → project mode (ProjectStore)
- *   TWINE_LIBRARY=/path/to/library  → library mode (StoryStore)
- *   (neither)                       → library mode, auto-detected path
+ * Reads TWINE_PROJECT from the environment and resolves the path,
+ * expanding ~ and environment variable references for both POSIX
+ * and Windows conventions.
  */
 
-import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
-/** Electron userData directories per platform. */
-const ELECTRON_USER_DATA: Record<string, string> = {
-  win32: path.join(
-    os.homedir(),
-    'AppData',
-    'Roaming',
-    'Twine',
-  ),
-  darwin: path.join(
-    os.homedir(),
-    'Library',
-    'Application Support',
-    'Twine',
-  ),
-  linux: path.join(os.homedir(), '.config', 'Twine'),
-};
-
-/** Default story library path per platform. */
-const DEFAULT_LIBRARY: Record<string, string> = {
-  win32: path.join(os.homedir(), 'Documents', 'Twine', 'Stories'),
-  darwin: path.join(os.homedir(), 'Documents', 'Twine', 'Stories'),
-  linux: path.join(os.homedir(), 'Documents', 'Twine', 'Stories'),
-};
-
-interface AppPrefs {
-  storyLibraryFolderPath?: string;
-}
-
 /**
- * Reads Electron app-prefs.json and returns storyLibraryFolderPath if set.
+ * Expand ~ and environment variable references in a path string.
+ * Handles POSIX ($HOME, ${VAR}) and Windows (%VAR%) conventions.
  *
- * @returns Path string or null if not found
+ * @param input - Raw path string from user or env var
+ * @returns Absolute, fully-expanded path
  */
-function readElectronPrefs(): string | null {
-  const userData = ELECTRON_USER_DATA[process.platform];
-  if (!userData) return null;
-  const prefsPath = path.join(userData, 'app-prefs.json');
-  try {
-    const raw = fs.readFileSync(prefsPath, 'utf-8');
-    const prefs: AppPrefs = JSON.parse(raw);
-    return prefs.storyLibraryFolderPath ?? null;
-  } catch {
-    return null;
+export function expandPath(input: string): string {
+  let p = input.trim();
+
+  // %VAR% — Windows style
+  p = p.replace(/%([^%]+)%/g, (_, name: string) =>
+    process.env[name] ?? `%${name}%`,
+  );
+
+  // ${VAR} or $VAR — POSIX style
+  p = p.replace(
+    /\$\{([^}]+)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g,
+    (orig, braced: string | undefined, plain: string | undefined) => {
+      const name = braced ?? plain ?? '';
+      return process.env[name] ?? orig;
+    },
+  );
+
+  // Leading ~ → home directory
+  if (p.startsWith('~')) {
+    p = os.homedir() + p.slice(1);
   }
+
+  return path.resolve(p);
 }
 
 /**
- * Resolves the story library directory, checking in order:
- *   1. TWINE_LIBRARY environment variable
- *   2. Electron app-prefs.json
- *   3. OS default (~/Documents/Twine/Stories)
+ * Returns the workspace root from the TWINE_PROJECT environment variable.
+ * Expands ~ and environment variable references before resolving.
+ * Throws a descriptive error if TWINE_PROJECT is not set.
  *
- * @returns Absolute path to the story library folder
+ * @returns Absolute path to the workspace root
+ * @throws Error if TWINE_PROJECT is not set
  */
-export function resolveLibraryPath(): string {
-  if (process.env['TWINE_LIBRARY']) {
-    return path.resolve(process.env['TWINE_LIBRARY']);
+export function requireWorkspaceRoot(): string {
+  const raw = process.env['TWINE_PROJECT'];
+  if (!raw) {
+    throw new Error(
+      'TWINE_PROJECT is not set.\n' +
+      'Run "twine-mcp setup" or add TWINE_PROJECT to your MCP config env block.',
+    );
   }
-  const fromPrefs = readElectronPrefs();
-  if (fromPrefs) return path.resolve(fromPrefs);
-  return DEFAULT_LIBRARY[process.platform] ??
-    path.join(os.homedir(), 'Documents', 'Twine', 'Stories');
-}
-
-/**
- * Ensures the library directory exists, creating it if needed.
- *
- * @param libraryPath - Absolute path to verify/create
- */
-export function ensureLibraryExists(libraryPath: string): void {
-  fs.mkdirSync(libraryPath, { recursive: true });
-}
-
-/**
- * Returns the project root directory if TWINE_PROJECT is set,
- * otherwise returns null (library mode).
- *
- * @returns Absolute project root path, or null for library mode
- */
-export function resolveProjectRoot(): string | null {
-  if (process.env['TWINE_PROJECT']) {
-    return path.resolve(process.env['TWINE_PROJECT']);
-  }
-  return null;
-}
-
-/**
- * Returns the server operating mode based on environment variables.
- *
- * @returns 'project' if TWINE_PROJECT is set, otherwise 'library'
- */
-export function getServerMode(): 'project' | 'library' {
-  return process.env['TWINE_PROJECT'] ? 'project' : 'library';
+  return expandPath(raw);
 }

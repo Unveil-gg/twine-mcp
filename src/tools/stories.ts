@@ -1,18 +1,17 @@
 /**
- * Story-level MCP tools: list, get, create, delete, export, compile.
+ * Story-level MCP tools: list, get, create, delete, export.
  * Registered onto McpServer in server.ts.
  */
 
 import * as z from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { parseTwine2HTML, Story } from 'extwee';
 import type { IStoryStore } from '../types.js';
 
 /**
  * Registers all story-management tools on the MCP server.
  *
  * @param server - McpServer instance
- * @param store  - StoryStore instance
+ * @param store  - IStoryStore implementation
  */
 export function registerStoryTools(
   server: McpServer,
@@ -23,7 +22,9 @@ export function registerStoryTools(
     'list_stories',
     {
       description:
-        'List all Twine stories in the library with basic metadata. ' +
+        'List all Twine game projects discovered in the workspace. ' +
+        'Use this to understand what stories exist — helpful for ' +
+        'disambiguation when the user has multiple games. ' +
         'Use fields to limit output size.',
       inputSchema: {
         fields: z
@@ -39,9 +40,7 @@ export function registerStoryTools(
             ]),
           )
           .optional()
-          .describe(
-            'Return only these fields. Omit for all fields.',
-          ),
+          .describe('Return only these fields. Omit for all fields.'),
       },
     },
     async ({ fields }) => {
@@ -106,15 +105,17 @@ export function registerStoryTools(
     'create_story',
     {
       description:
-        'Create a new Twine story file with a Start passage. ' +
-        'Returns the new story metadata.',
+        'Create a new Twine story with a Start passage. ' +
+        'For a full project with src/ layout use create_project instead.',
       inputSchema: {
         name: z.string().describe('Story name'),
         format: z
           .string()
           .optional()
           .default('Harlowe')
-          .describe('Story format name (Harlowe, SugarCube, Chapbook, Snowman)'),
+          .describe(
+            'Story format name (Harlowe, SugarCube, Chapbook, Snowman)',
+          ),
         format_version: z
           .string()
           .optional()
@@ -135,8 +136,7 @@ export function registerStoryTools(
   server.registerTool(
     'delete_story',
     {
-      description:
-        'Delete a story file from the library. This cannot be undone.',
+      description: 'Delete a story. This cannot be undone.',
       inputSchema: {
         name: z.string().describe('Story name to delete'),
       },
@@ -154,73 +154,17 @@ export function registerStoryTools(
     {
       description:
         'Export a story as Twee 3 source text. ' +
-        'Useful for reading narrative content and for external tools.',
+        'Useful for reading all passage content or feeding into external tools.',
       inputSchema: {
         name: z.string().describe('Story name'),
       },
     },
     async ({ name }) => {
-      const raw = store.getRaw?.(name);
-      if (raw) {
-        // Library mode: parse from HTML then export as Twee
-        const story = parseTwine2HTML(raw.rawHtml) as Story;
-        return { content: [{ type: 'text' as const, text: story.toTwee() }] };
-      }
-      // Project mode: use the merged Story object directly
       const storyObj = store.getStoryObject(name);
       if (!storyObj) return err(`Story "${name}" not found.`);
-      return { content: [{ type: 'text' as const, text: storyObj.toTwee() }] };
-    },
-  );
-
-  /** compile_story */
-  server.registerTool(
-    'compile_story',
-    {
-      description:
-        'Compile a story to a self-contained playable HTML file at the ' +
-        'given output path. Returns the output file path on success.',
-      inputSchema: {
-        name: z.string().describe('Story name'),
-        output_path: z
-          .string()
-          .describe('Absolute path for the output HTML file'),
-      },
-    },
-    async ({ name, output_path }) => {
-      const raw = store.getRaw?.(name);
-      if (!raw) return err(
-        `Story "${name}" not found. ` +
-        'In project mode, use build_story for a playable HTML output.',
-      );
-      const story = parseTwine2HTML(raw.rawHtml) as Story;
-      // toTwine2HTML gives the data block; for a playable file we use the
-      // same approach as the library file — splice into a minimal shell.
-      // Full playable HTML requires a story format; we produce a proofing
-      // export that includes all passage text in a readable HTML document.
-      const twee = story.toTwee();
-      const passageList = (story.passages as import('extwee').Passage[])
-        .map(
-          (p) =>
-            `<section><h2>${escHtml(p.name)}</h2>` +
-            `<pre>${escHtml(p.text)}</pre></section>`,
-        )
-        .join('\n');
-      const html =
-        `<!DOCTYPE html><html><head><meta charset="utf-8">` +
-        `<title>${escHtml(story.name)} — Proofing Export</title>` +
-        `<style>body{font-family:sans-serif;max-width:800px;margin:2em auto}` +
-        `h2{color:#555}pre{white-space:pre-wrap}</style></head>` +
-        `<body><h1>${escHtml(story.name)}</h1>` +
-        `<p><strong>Format:</strong> ${escHtml(story.format)} ${escHtml(story.formatVersion)}</p>` +
-        `<p><strong>Start:</strong> ${escHtml(story.start)}</p>` +
-        `<hr>${passageList}` +
-        `<details><summary>Twee Source</summary><pre>${escHtml(twee)}</pre></details>` +
-        `</body></html>`;
-
-      const { writeFileSync } = await import('fs');
-      writeFileSync(output_path, html, 'utf-8');
-      return ok({ outputPath: output_path, passages: story.passages.length });
+      return {
+        content: [{ type: 'text' as const, text: storyObj.toTwee() }],
+      };
     },
   );
 }
@@ -238,18 +182,4 @@ export function err(message: string) {
     content: [{ type: 'text' as const, text: `ERROR: ${message}` }],
     isError: true,
   };
-}
-
-/**
- * Escapes HTML special characters to produce safe HTML output.
- *
- * @param s - Raw string to escape
- * @returns HTML-safe string with &, <, >, " replaced by entities
- */
-function escHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }

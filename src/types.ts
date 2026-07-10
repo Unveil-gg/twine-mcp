@@ -1,8 +1,4 @@
-/**
- * Shared TypeScript types for twine-mcp.
- * Includes the IStoryStore interface implemented by both StoryStore
- * (library mode) and ProjectStore (project mode).
- */
+/** Shared TypeScript types for twine-mcp. */
 
 import type { Story } from 'extwee';
 
@@ -42,14 +38,6 @@ export interface StoryFull extends StoryMeta {
   tagColors: Record<string, string>;
   storyJavaScript: string;
   storyStylesheet: string;
-}
-
-/** Entry kept in the story store. */
-export interface StoreEntry {
-  meta: StoryMeta;
-  /** Raw HTML as read from disk (used for write-back). */
-  rawHtml: string;
-  lastModified: Date;
 }
 
 /** Adjacency list graph: passage name → array of linked passage names. */
@@ -103,9 +91,8 @@ export interface EndingNode {
 }
 
 /**
- * Common store interface implemented by StoryStore (library mode)
- * and ProjectStore (project mode). All MCP tool handlers accept
- * IStoryStore so they work in either mode without modification.
+ * Common store interface implemented by WorkspaceStore (and ProjectStore
+ * internally). All MCP tool handlers accept IStoryStore.
  */
 export interface IStoryStore {
   listStories(): StoryMeta[];
@@ -118,13 +105,11 @@ export interface IStoryStore {
     formatVersion?: string,
   ): StoryMeta;
   deleteStory(name: string): boolean;
-  /** Library mode only: raw HTML for export_twee. */
-  getRaw?(name: string): { rawHtml: string; mtime: Date } | null;
-  /** Project mode only: source .twee file for a passage. */
+  /** Source .twee file for a passage (passage name → absolute path). */
   getPassageFile?(name: string): string | undefined;
-  /** Project mode only: update passage-to-file mapping. */
+  /** Update the passage-to-file mapping. */
   setPassageFile?(name: string, filePath: string): void;
-  /** Project mode only: list source files with passage stats. */
+  /** List source files with passage stats. */
   listFiles?(): FileEntry[];
   close?(): Promise<void>;
 }

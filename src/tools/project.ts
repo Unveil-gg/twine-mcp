@@ -1,9 +1,10 @@
 /**
  * Project-mode MCP tools: create_project, build_story, validate_story,
- * import_from_twine, move_passage, list_files.
+ * import_from_twine, move_passage, list_files, export_for_twine.
  *
- * These tools require ProjectStore (project mode). They are only
- * registered when TWINE_PROJECT is set.
+ * These tools require a WorkspaceStore and operate on individual game
+ * projects within the workspace. Most accept a `story` parameter that
+ * identifies which game to operate on.
  */
 
 import * as z from 'zod/v4';
@@ -17,7 +18,7 @@ import {
   compileTwine2HTML,
   generateIFID,
 } from 'extwee';
-import type { ProjectStore } from '../project-store.js';
+import type { WorkspaceStore } from '../workspace-store.js';
 import { resolveFormat, DEFAULT_FORMAT_VERSIONS } from '../format-manager.js';
 import { ok, err } from './stories.js';
 import type { ValidationIssue } from '../types.js';
@@ -32,12 +33,12 @@ const SPECIAL_PASSAGES = new Set([
 /**
  * Registers all project-mode tools on the MCP server.
  *
- * @param server - McpServer instance
- * @param store  - ProjectStore instance
+ * @param server    - McpServer instance
+ * @param workspace - WorkspaceStore instance
  */
 export function registerProjectTools(
   server: McpServer,
-  store: ProjectStore,
+  workspace: WorkspaceStore,
 ): void {
   /** create_project */
   server.registerTool(
@@ -60,9 +61,7 @@ export function registerProjectTools(
         format_version: z
           .string()
           .optional()
-          .describe(
-            'Format version. Omit to use the bundled default.',
-          ),
+          .describe('Format version. Omit to use the bundled default.'),
       },
     },
     async ({ project_dir, story_name, format, format_version }) => {
@@ -82,9 +81,7 @@ export function registerProjectTools(
 
       const fmtKey = format.toLowerCase();
       const resolvedVersion =
-        format_version ??
-        DEFAULT_FORMAT_VERSIONS[fmtKey] ??
-        '1.0.0';
+        format_version ?? DEFAULT_FORMAT_VERSIONS[fmtKey] ?? '1.0.0';
       const ifid = generateIFID();
 
       const storyDataContent =
@@ -98,11 +95,8 @@ export function registerProjectTools(
         `  "zoom": 1\n` +
         `}\n`;
 
-      const startContent =
-        `:: Start\nYour story begins here.\n`;
-
-      const gitignore =
-        `dist/\n.twine-mcp/\n.tweenode/\nnode_modules/\n`;
+      const startContent = `:: Start\nYour story begins here.\n`;
+      const gitignore = `dist/\n.twine-mcp/\n.tweenode/\nnode_modules/\n`;
 
       fs.writeFileSync(
         path.join(srcDir, 'StoryData.twee'), storyDataContent, 'utf-8',
@@ -137,6 +131,7 @@ export function registerProjectTools(
           'dist/',
           'assets/',
         ],
+        note: 'Restart the MCP server so the new project is discovered.',
       });
     },
   );
@@ -146,15 +141,14 @@ export function registerProjectTools(
     'validate_story',
     {
       description:
-        'Validate the current project story: checks for broken links, ' +
-        'missing start passage, duplicate passage names, IFID, and format. ' +
-        'Run before build_story to catch issues early.',
+        'Validate a story: checks for broken links, missing start passage, ' +
+        'IFID, and format. Run before build_story to catch issues early.',
       inputSchema: {
         story: z.string().describe('Story name'),
       },
     },
     async ({ story }) => {
-      const full = store.getStoryFull(story);
+      const full = workspace.getStoryFull(story);
       if (!full) return err(`Story "${story}" not found.`);
 
       const issues: ValidationIssue[] = [];
@@ -173,7 +167,6 @@ export function registerProjectTools(
         });
       }
 
-      // Broken links
       for (const p of full.passages) {
         for (const link of p.links) {
           if (!names.has(link)) {
@@ -217,7 +210,9 @@ export function registerProjectTools(
       },
     },
     async ({ story, output_path }) => {
-      const storyObj = store.getStoryObject(story);
+      const ps = workspace.getProjectStore(story);
+      if (!ps) return err(`Story "${story}" not found.`);
+      const storyObj = ps.getStoryObject(story);
       if (!storyObj) return err(`Story "${story}" not found.`);
 
       const format = storyObj.format || 'Harlowe';
@@ -240,7 +235,7 @@ export function registerProjectTools(
         return err(`Compilation failed: ${String(e)}`);
       }
 
-      const outDir = path.join(store.projectRoot, 'dist');
+      const outDir = path.join(ps.projectRoot, 'dist');
       fs.mkdirSync(outDir, { recursive: true });
       const safeName = storyObj.name.replace(/[^\w\s-]/g, '').trim();
       const dest =
@@ -262,18 +257,18 @@ export function registerProjectTools(
     'import_from_twine',
     {
       description:
-        'Import a Twine desktop story HTML file into the current project ' +
-        'as organized .twee source files. Detects the story format, ' +
-        'preserves the IFID and passage positions, and downloads the format.',
+        'Import a Twine desktop story HTML file into a Twee project directory. ' +
+        'Detects format, preserves IFID and passage positions, ' +
+        'and downloads the format for future builds.',
       inputSchema: {
         html_path: z
           .string()
           .describe('Absolute path to the Twine story .html file'),
         target_dir: z
           .string()
-          .optional()
           .describe(
-            'Target project directory. Defaults to current project root.',
+            'Target project directory (absolute path). ' +
+            'Will be created if it does not exist.',
           ),
       },
     },
@@ -289,24 +284,24 @@ export function registerProjectTools(
         return err(`Failed to parse Twine HTML: ${String(e)}`);
       }
 
-      const destRoot = target_dir ?? store.projectRoot;
-      const srcDir = path.join(destRoot, 'src');
+      const srcDir = path.join(target_dir, 'src');
       fs.mkdirSync(srcDir, { recursive: true });
-      fs.mkdirSync(path.join(destRoot, 'dist'), { recursive: true });
+      fs.mkdirSync(path.join(target_dir, 'dist'), { recursive: true });
 
-      // Separate special passages from story passages
       const special: Passage[] = [];
       const storyPassages: Passage[] = [];
       for (const p of imported.passages as Passage[]) {
-        if (SPECIAL_PASSAGES.has(p.name) || p.tags.includes('script') ||
-            p.tags.includes('stylesheet')) {
+        if (
+          SPECIAL_PASSAGES.has(p.name) ||
+          p.tags.includes('script') ||
+          p.tags.includes('stylesheet')
+        ) {
           special.push(p);
         } else {
           storyPassages.push(p);
         }
       }
 
-      // Write StoryData.twee (title, data, special passages)
       const storyDataContent =
         `:: StoryTitle\n${imported.name}\n\n` +
         `:: StoryData\n` +
@@ -324,7 +319,6 @@ export function registerProjectTools(
         path.join(srcDir, 'StoryData.twee'), storyDataContent, 'utf-8',
       );
 
-      // Group story passages by first tag (or 'passages' if untagged)
       const byGroup = new Map<string, Passage[]>();
       for (const p of storyPassages) {
         const group = p.tags[0] ?? 'passages';
@@ -336,28 +330,25 @@ export function registerProjectTools(
       for (const [group, passages] of byGroup) {
         const fileName = `${group}.twee`;
         const content = passages.map((p) => p.toTwee()).join('\n\n') + '\n';
-        const filePath = path.join(srcDir, fileName);
-        fs.writeFileSync(filePath, content, 'utf-8');
+        fs.writeFileSync(path.join(srcDir, fileName), content, 'utf-8');
         filesWritten.push(`src/${fileName}`);
       }
 
-      if (!fs.existsSync(path.join(destRoot, '.gitignore'))) {
+      if (!fs.existsSync(path.join(target_dir, '.gitignore'))) {
         fs.writeFileSync(
-          path.join(destRoot, '.gitignore'),
+          path.join(target_dir, '.gitignore'),
           'dist/\n.twine-mcp/\n.tweenode/\n',
           'utf-8',
         );
         filesWritten.push('.gitignore');
       }
 
-      // Download format in background
       let formatCached = false;
       try {
         await resolveFormat(imported.format, imported.formatVersion);
         formatCached = true;
       } catch { /* retry on build */ }
 
-      store.reload();
       return ok({
         storyName: imported.name,
         format: imported.format,
@@ -365,6 +356,7 @@ export function registerProjectTools(
         passageCount: (imported.passages as Passage[]).length,
         filesWritten,
         formatCached,
+        note: 'Restart the MCP server so the new project is discovered.',
       });
     },
   );
@@ -382,13 +374,15 @@ export function registerProjectTools(
         target_file: z
           .string()
           .describe(
-            'Target .twee file path (relative to project root, ' +
-            'e.g. "src/chapters/act2.twee")',
+            'Target .twee file path relative to project root, ' +
+            'e.g. "src/chapters/act2.twee"',
           ),
       },
     },
     async ({ story, passage, target_file }) => {
-      const storyObj = store.getStoryObject(story);
+      const ps = workspace.getProjectStore(story);
+      if (!ps) return err(`Story "${story}" not found.`);
+      const storyObj = ps.getStoryObject(story);
       if (!storyObj) return err(`Story "${story}" not found.`);
       if (!storyObj.getPassageByName(passage)) {
         return err(`Passage "${passage}" not found.`);
@@ -396,18 +390,18 @@ export function registerProjectTools(
 
       const absTarget = path.isAbsolute(target_file)
         ? target_file
-        : path.join(store.projectRoot, target_file);
+        : path.join(ps.projectRoot, target_file);
 
-      const currentFile = store.getPassageFile(passage);
-      store.setPassageFile(passage, absTarget);
-      store.saveStory(storyObj);
+      const currentFile = ps.getPassageFile(passage);
+      ps.setPassageFile(passage, absTarget);
+      ps.saveStory(storyObj);
 
       return ok({
         passage,
         movedFrom: currentFile
-          ? path.relative(store.projectRoot, currentFile)
+          ? path.relative(ps.projectRoot, currentFile)
           : null,
-        movedTo: path.relative(store.projectRoot, absTarget),
+        movedTo: path.relative(ps.projectRoot, absTarget),
       });
     },
   );
@@ -417,19 +411,21 @@ export function registerProjectTools(
     'list_files',
     {
       description:
-        'List all .twee source files in the project with passage and ' +
-        'word counts per file. Cheapest way to understand project structure.',
-      inputSchema: {},
+        'List all .twee source files in a project with passage and word ' +
+        'counts per file. Cheapest way to understand project structure.',
+      inputSchema: {
+        story: z.string().describe('Story name'),
+      },
     },
-    async () => {
-      const files = store.listFiles();
-      const totalPassages = files.reduce((s, f) => s + f.passageCount, 0);
-      const totalWords = files.reduce((s, f) => s + f.wordCount, 0);
+    async ({ story }) => {
+      const ps = workspace.getProjectStore(story);
+      if (!ps) return err(`Story "${story}" not found.`);
+      const files = ps.listFiles();
       return ok({
-        projectRoot: store.projectRoot,
+        projectRoot: ps.projectRoot,
         fileCount: files.length,
-        totalPassages,
-        totalWords,
+        totalPassages: files.reduce((s, f) => s + f.passageCount, 0),
+        totalWords: files.reduce((s, f) => s + f.wordCount, 0),
         files,
       });
     },
@@ -454,17 +450,18 @@ export function registerProjectTools(
       },
     },
     async ({ story, output_path }) => {
-      const storyObj = store.getStoryObject(story);
+      const ps = workspace.getProjectStore(story);
+      if (!ps) return err(`Story "${story}" not found.`);
+      const storyObj = ps.getStoryObject(story);
       if (!storyObj) return err(`Story "${story}" not found.`);
 
-      // Generate archive HTML using extwee's Twine2 HTML serializer
       const archiveHtml = storyObj.toTwine2HTML();
       const wrapped =
         `<!DOCTYPE html><html><head><meta charset="utf-8">` +
         `<title>${storyObj.name} — Archive</title></head>` +
         `<body>${archiveHtml}</body></html>`;
 
-      const outDir = path.join(store.projectRoot, 'dist');
+      const outDir = path.join(ps.projectRoot, 'dist');
       fs.mkdirSync(outDir, { recursive: true });
       const safeName = storyObj.name.replace(/[^\w\s-]/g, '').trim();
       const dest =
