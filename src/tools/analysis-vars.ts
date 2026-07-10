@@ -6,7 +6,7 @@
 
 import * as z from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { StoryStore } from '../story-store.js';
+import type { IStoryStore } from '../types.js';
 import { getFormatHints } from '../util/format-hints.js';
 import { ok, err } from './stories.js';
 import type { VarUsage } from '../types.js';
@@ -19,7 +19,7 @@ import type { VarUsage } from '../types.js';
  */
 export function registerAnalysisVarTools(
   server: McpServer,
-  store: StoryStore,
+  store: IStoryStore,
 ): void {
   /** find_variable_usage */
   server.registerTool(

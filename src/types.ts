@@ -1,4 +1,10 @@
-/** Shared TypeScript types for twine-mcp. */
+/**
+ * Shared TypeScript types for twine-mcp.
+ * Includes the IStoryStore interface implemented by both StoryStore
+ * (library mode) and ProjectStore (project mode).
+ */
+
+import type { Story } from 'extwee';
 
 /** Lightweight passage representation for list/compact responses. */
 export interface PassageMeta {
@@ -94,6 +100,48 @@ export interface EndingNode {
   text: string;
   tags: string[];
   path: string[];
+}
+
+/**
+ * Common store interface implemented by StoryStore (library mode)
+ * and ProjectStore (project mode). All MCP tool handlers accept
+ * IStoryStore so they work in either mode without modification.
+ */
+export interface IStoryStore {
+  listStories(): StoryMeta[];
+  getStoryFull(name: string): StoryFull | null;
+  getStoryObject(name: string): Story | null;
+  saveStory(story: Story): void;
+  createStory(
+    name: string,
+    format?: string,
+    formatVersion?: string,
+  ): StoryMeta;
+  deleteStory(name: string): boolean;
+  /** Library mode only: raw HTML for export_twee. */
+  getRaw?(name: string): { rawHtml: string; mtime: Date } | null;
+  /** Project mode only: source .twee file for a passage. */
+  getPassageFile?(name: string): string | undefined;
+  /** Project mode only: update passage-to-file mapping. */
+  setPassageFile?(name: string, filePath: string): void;
+  /** Project mode only: list source files with passage stats. */
+  listFiles?(): FileEntry[];
+  close?(): Promise<void>;
+}
+
+/** Source file entry returned by list_files in project mode. */
+export interface FileEntry {
+  filePath: string;
+  relativePath: string;
+  passageCount: number;
+  wordCount: number;
+}
+
+/** A single validation result item from validate_story. */
+export interface ValidationIssue {
+  type: 'error' | 'warning';
+  message: string;
+  passage?: string;
 }
 
 /** Branch point with sub-branch summary. */

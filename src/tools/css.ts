@@ -14,7 +14,7 @@
 import * as z from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Passage } from 'extwee';
-import type { StoryStore } from '../story-store.js';
+import type { IStoryStore } from '../types.js';
 import { ok, err } from './stories.js';
 import { getStylesheetPassage } from '../util/format-hints.js';
 import type { PassageFull } from '../types.js';
@@ -46,7 +46,7 @@ function findStylesheetPassage(
  */
 export function registerCssTools(
   server: McpServer,
-  store: StoryStore,
+  store: IStoryStore,
 ): void {
   /** get_stylesheet */
   server.registerTool(

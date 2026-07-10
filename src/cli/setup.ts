@@ -10,6 +10,7 @@ import os from 'os';
 import { execSync } from 'child_process';
 import readline from 'readline';
 import { resolveLibraryPath } from '../config.js';
+import { VERSION } from '../version.js';
 
 // ─── ANSI helpers ─────────────────────────────────────────────────────────────
 
@@ -209,7 +210,7 @@ function getClients(): ClientDef[] {
 /** Runs the interactive setup wizard. Called from server.ts on `setup` arg. */
 export async function runSetup(): Promise<void> {
   console.log(
-    '\n' + bold('  twine-mcp setup') + '  ' + dim('v0.1.0'),
+    '\n' + bold('  twine-mcp setup') + '  ' + dim(`v${VERSION}`),
   );
   console.log(dim('  MCP server for Twine interactive story authoring\n'));
 
@@ -234,7 +235,41 @@ export async function runSetup(): Promise<void> {
   }
   console.log();
 
-  // 2. Select editor
+  // 2. Select mode
+  const modeIdx = await selectMenu(
+    'Which mode would you like to use?',
+    [
+      'Project mode  (recommended) — edit .twee files in a Git project',
+      'Library mode               — edit stories in the Twine desktop app library',
+    ],
+  );
+  console.log();
+
+  let projectPath = '';
+  if (modeIdx === 0) {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    projectPath = await new Promise<string>((resolve) => {
+      rl.question(
+        `  ${bold('Project directory')} (absolute path, e.g. ~/Documents/my-game): `,
+        (answer) => {
+          rl.close();
+          resolve(answer.trim());
+        },
+      );
+    });
+    console.log();
+    if (!projectPath) {
+      console.log(
+        `  ${yellow('⚠')} No path entered. ` +
+        `You can set TWINE_PROJECT manually in the MCP config.\n`,
+      );
+    }
+  }
+
+  // 3. Select editor
   const clients = getClients();
   const clientIdx = await selectMenu(
     'Which editor or coding interface are you setting up?',
@@ -243,21 +278,25 @@ export async function runSetup(): Promise<void> {
   const client = clients[clientIdx];
   console.log(`  ${green('✓')} ${bold(client.label)} selected\n`);
 
-  // 3. Build the config block
+  // 4. Build the config block
+  const env: Record<string, string> =
+    modeIdx === 0 && projectPath
+      ? { TWINE_PROJECT: projectPath }
+      : { TWINE_LIBRARY: libPath };
   const mcpBlock: Record<string, unknown> = {
     command: 'twine-mcp',
-    env: { TWINE_LIBRARY: libPath },
+    env,
   };
   const snippet = JSON.stringify({ mcpServers: { twine: mcpBlock } }, null, 2);
 
-  // 4. Auto-write or manual clipboard
-  const modeIdx = await selectMenu('How would you like to configure?', [
+  // 5. Auto-write or manual clipboard
+  const writeIdx = await selectMenu('How would you like to configure?', [
     `Auto   → write directly to ${client.hint}`,
     `Manual → copy config block to clipboard`,
   ]);
   console.log();
 
-  if (modeIdx === 0) {
+  if (writeIdx === 0) {
     try {
       mergeConfig(client.configPath, mcpBlock);
       console.log(`  ${green('✓')} Written to ${bold(client.hint)}`);

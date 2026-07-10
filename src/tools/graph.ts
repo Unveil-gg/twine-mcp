@@ -5,7 +5,7 @@
 
 import * as z from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { StoryStore } from '../story-store.js';
+import type { IStoryStore } from '../types.js';
 import { buildLinkGraph } from '../story-store.js';
 import {
   findCycles,
@@ -22,7 +22,7 @@ import { ok, err } from './stories.js';
  */
 export function registerGraphTools(
   server: McpServer,
-  store: StoryStore,
+  store: IStoryStore,
 ): void {
   /** get_link_graph */
   server.registerTool(

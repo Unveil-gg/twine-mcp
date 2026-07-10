@@ -1,6 +1,11 @@
 /**
- * Resolves the Twine story library path from environment variables,
- * Electron app-prefs.json, or the OS default.
+ * Resolves the Twine story library path and project root from
+ * environment variables, Electron app-prefs.json, or the OS default.
+ *
+ * Mode selection:
+ *   TWINE_PROJECT=/path/to/project  → project mode (ProjectStore)
+ *   TWINE_LIBRARY=/path/to/library  → library mode (StoryStore)
+ *   (neither)                       → library mode, auto-detected path
  */
 
 import fs from 'fs';
@@ -78,4 +83,26 @@ export function resolveLibraryPath(): string {
  */
 export function ensureLibraryExists(libraryPath: string): void {
   fs.mkdirSync(libraryPath, { recursive: true });
+}
+
+/**
+ * Returns the project root directory if TWINE_PROJECT is set,
+ * otherwise returns null (library mode).
+ *
+ * @returns Absolute project root path, or null for library mode
+ */
+export function resolveProjectRoot(): string | null {
+  if (process.env['TWINE_PROJECT']) {
+    return path.resolve(process.env['TWINE_PROJECT']);
+  }
+  return null;
+}
+
+/**
+ * Returns the server operating mode based on environment variables.
+ *
+ * @returns 'project' if TWINE_PROJECT is set, otherwise 'library'
+ */
+export function getServerMode(): 'project' | 'library' {
+  return process.env['TWINE_PROJECT'] ? 'project' : 'library';
 }

@@ -6,7 +6,7 @@
 
 import * as z from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { StoryStore } from '../story-store.js';
+import type { IStoryStore } from '../types.js';
 import { buildLinkGraph } from '../story-store.js';
 import { findCycles, reachableFrom } from '../util/graph-algos.js';
 import { ok, err } from './stories.js';
@@ -21,7 +21,7 @@ import type { AnalysisReport, BrokenLink } from '../types.js';
  */
 export function registerAnalysisTools(
   server: McpServer,
-  store: StoryStore,
+  store: IStoryStore,
 ): void {
   /** analyze_story */
   server.registerTool(

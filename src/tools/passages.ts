@@ -6,7 +6,7 @@
 import * as z from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Passage } from 'extwee';
-import type { StoryStore } from '../story-store.js';
+import type { IStoryStore } from '../types.js';
 import { ok, err } from './stories.js';
 
 /**
@@ -17,7 +17,7 @@ import { ok, err } from './stories.js';
  */
 export function registerPassageTools(
   server: McpServer,
-  store: StoryStore,
+  store: IStoryStore,
 ): void {
   /** list_passages */
   server.registerTool(
@@ -38,10 +38,14 @@ export function registerPassageTools(
               'position',
               'preview',
               'links',
+              'file',
             ]),
           )
           .optional()
-          .describe('Fields to include. Default: name, tags, wordCount.'),
+          .describe(
+            'Fields to include. Default: name, tags, wordCount. ' +
+            '"file" is project-mode only (source .twee path).',
+          ),
         tag_filter: z
           .string()
           .optional()
@@ -64,7 +68,11 @@ export function registerPassageTools(
         const src = p as unknown as Record<string, unknown>;
         const out: Record<string, unknown> = {};
         for (const f of selectedFields) {
-          out[f] = src[f];
+          if (f === 'file') {
+            out['file'] = store.getPassageFile?.(p.name) ?? null;
+          } else {
+            out[f] = src[f];
+          }
         }
         return out;
       });

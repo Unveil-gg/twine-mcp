@@ -6,7 +6,7 @@
 import * as z from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { parseTwine2HTML, Story } from 'extwee';
-import { StoryStore } from '../story-store.js';
+import type { IStoryStore } from '../types.js';
 
 /**
  * Registers all story-management tools on the MCP server.
@@ -16,7 +16,7 @@ import { StoryStore } from '../story-store.js';
  */
 export function registerStoryTools(
   server: McpServer,
-  store: StoryStore,
+  store: IStoryStore,
 ): void {
   /** list_stories */
   server.registerTool(
@@ -160,11 +160,16 @@ export function registerStoryTools(
       },
     },
     async ({ name }) => {
-      const raw = store.getRaw(name);
-      if (!raw) return err(`Story "${name}" not found.`);
-      const story = parseTwine2HTML(raw.rawHtml) as Story;
-      const twee = story.toTwee();
-      return { content: [{ type: 'text' as const, text: twee }] };
+      const raw = store.getRaw?.(name);
+      if (raw) {
+        // Library mode: parse from HTML then export as Twee
+        const story = parseTwine2HTML(raw.rawHtml) as Story;
+        return { content: [{ type: 'text' as const, text: story.toTwee() }] };
+      }
+      // Project mode: use the merged Story object directly
+      const storyObj = store.getStoryObject(name);
+      if (!storyObj) return err(`Story "${name}" not found.`);
+      return { content: [{ type: 'text' as const, text: storyObj.toTwee() }] };
     },
   );
 
@@ -183,8 +188,11 @@ export function registerStoryTools(
       },
     },
     async ({ name, output_path }) => {
-      const raw = store.getRaw(name);
-      if (!raw) return err(`Story "${name}" not found.`);
+      const raw = store.getRaw?.(name);
+      if (!raw) return err(
+        `Story "${name}" not found. ` +
+        'In project mode, use build_story for a playable HTML output.',
+      );
       const story = parseTwine2HTML(raw.rawHtml) as Story;
       // toTwine2HTML gives the data block; for a playable file we use the
       // same approach as the library file — splice into a minimal shell.

@@ -8,7 +8,7 @@ import path from 'path';
 import os from 'os';
 import fs from 'fs';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { StoryStore } from '../story-store.js';
+import type { IStoryStore } from '../types.js';
 import { getSyntaxGuide } from '../util/format-hints.js';
 import { ok, err } from './stories.js';
 
@@ -88,7 +88,7 @@ function readUserFormats(): Array<{ name: string; url: string }> {
  */
 export function registerFormatTools(
   server: McpServer,
-  store: StoryStore,
+  store: IStoryStore,
 ): void {
   /** list_story_formats */
   server.registerTool(
