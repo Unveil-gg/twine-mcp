@@ -29,47 +29,26 @@ const DEFAULT_WORKSPACE = path.join(
   'Stories',
 );
 
-// ─── Text input (readline) ────────────────────────────────────────────────────
-
-/**
- * Prompt the user for a path with a pre-filled default.
- * Pressing Enter with no input accepts the default.
- * readline is fully closed before returning so raw mode can open after.
- *
- * @param label   - Short label shown before the bracketed default
- * @param default_ - Default value shown in brackets
- * @returns Entered string, or the default if blank
- */
-async function askPath(label: string, default_: string): Promise<string> {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-  return new Promise((resolve) => {
-    rl.question(
-      `  ${bold(label)} ${dim(`[${default_}]`)}: `,
-      (answer) => {
-        rl.close();
-        resolve(answer.trim() || default_);
-      },
-    );
-  });
-}
-
 // ─── Arrow-key select menu ────────────────────────────────────────────────────
 
 /**
  * Render an arrow-key selector using raw stdin.
- * Must only be called after any readline interfaces are fully closed.
  *
- * @param prompt  - Label shown above options
- * @param options - Array of option strings
+ * @param prompt   - Label shown above options
+ * @param options  - Array of option strings
+ * @param delayMs  - Optional ms to wait before starting (use ~50 after readline)
  * @returns Zero-based index of the selected option
  */
 async function selectMenu(
   prompt: string,
   options: string[],
+  delayMs = 0,
 ): Promise<number> {
+  // Flush any pending stdin events (e.g. Enter key from a preceding readline)
+  if (delayMs > 0) {
+    await new Promise<void>((res) => setTimeout(res, delayMs));
+  }
+
   return new Promise((resolve) => {
     let idx = 0;
 
@@ -115,6 +94,7 @@ async function selectMenu(
           if (stdin.isTTY) stdin.setRawMode(false);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           stdin.off('keypress', onKey as any);
+          stdin.pause();
           process.stdout.write('\n');
           resolve(idx);
           break;
@@ -123,6 +103,32 @@ async function selectMenu(
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     stdin.on('keypress', onKey as any);
+  });
+}
+
+// ─── Text input (readline) ────────────────────────────────────────────────────
+
+/**
+ * Prompt for a path with a pre-filled default.
+ * Pressing Enter with no input accepts the default.
+ *
+ * @param label    - Short label shown before the bracketed default
+ * @param default_ - Default value shown in brackets
+ * @returns Entered string, or the default if blank
+ */
+async function askPath(label: string, default_: string): Promise<string> {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  return new Promise((resolve) => {
+    rl.question(
+      `\n  ${bold(label)} ${dim(`[${default_}]`)}: `,
+      (answer) => {
+        rl.close();
+        resolve(answer.trim() || default_);
+      },
+    );
   });
 }
 
@@ -251,19 +257,29 @@ export async function runSetup(): Promise<void> {
     '\n' + bold('  twine-mcp setup') + '  ' + dim(`v${VERSION}`),
   );
   console.log(dim('  MCP server for Twine interactive story authoring\n'));
+  console.log(dim('  You can update any of these settings later in your MCP config.\n'));
 
-  // 1. Workspace directory — readline must close before raw mode opens
-  console.log(
-    dim('  Where are your Twine game projects? Press Enter to use the default.') +
-    dim(' You can change this later.\n'),
+  // 1. Workspace path — pure arrow-key menu, no readline yet
+  const pathChoice = await selectMenu(
+    'Games folder — where your Twine projects live',
+    [
+      `Use default  —  ${DEFAULT_WORKSPACE}`,
+      'Enter a different path...',
+    ],
   );
 
-  const rawPath = await askPath('Games folder', DEFAULT_WORKSPACE);
-  let workspacePath: string;
-  try {
-    workspacePath = expandPath(rawPath);
-  } catch {
-    workspacePath = rawPath;
+  let workspacePath = DEFAULT_WORKSPACE;
+  // Only opens readline if user explicitly asks for a custom path.
+  // The next selectMenu uses delayMs=50 to flush any buffered stdin events.
+  let usedReadline = false;
+  if (pathChoice === 1) {
+    usedReadline = true;
+    const raw = await askPath('Custom path', DEFAULT_WORKSPACE);
+    try {
+      workspacePath = expandPath(raw);
+    } catch {
+      workspacePath = raw;
+    }
   }
 
   if (!fs.existsSync(workspacePath)) {
@@ -272,17 +288,18 @@ export async function runSetup(): Promise<void> {
       `it will be created when you run ${cyan('create_project')}.\n`,
     );
   } else {
-    console.log(`\n  ${green('✓')} ${bold(workspacePath)}\n`);
+    console.log(`\n  ${green('✓')} ${bold(workspacePath)}`);
   }
 
-  // 2. Editor — arrow-key menu (raw mode, safe because readline is closed)
+  // 2. Editor — delay only if we used readline above
   const clients = getClients();
   const clientIdx = await selectMenu(
     'Which editor or coding interface are you setting up?',
     clients.map((c) => c.label),
+    usedReadline ? 50 : 0,
   );
   const client = clients[clientIdx];
-  console.log(`\n  ${green('✓')} ${bold(client.label)} selected\n`);
+  console.log(`\n  ${green('✓')} ${bold(client.label)} selected`);
 
   // 3. Build the config block
   const mcpBlock: Record<string, unknown> = {
@@ -291,7 +308,7 @@ export async function runSetup(): Promise<void> {
   };
   const snippet = JSON.stringify({ mcpServers: { twine: mcpBlock } }, null, 2);
 
-  // 4. Write method — arrow-key menu
+  // 4. Write method — no delay (previous was selectMenu, cleanup is clean)
   const writeIdx = await selectMenu(
     'How would you like to apply the config?',
     [
