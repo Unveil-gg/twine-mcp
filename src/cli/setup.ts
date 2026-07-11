@@ -88,8 +88,9 @@ async function selectMenu(
     render(true);
 
     const stdin = process.stdin;
-    if (stdin.isTTY) stdin.setRawMode(true);
     readline.emitKeypressEvents(stdin);
+    stdin.resume();
+    if (stdin.isTTY) stdin.setRawMode(true);
 
     const onKey = (
       _str: string | undefined,
