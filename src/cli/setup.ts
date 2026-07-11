@@ -21,69 +21,107 @@ const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
 const red = (s: string) => `\x1b[31m${s}\x1b[0m`;
 const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`;
 
-// ─── Prompt helpers ────────────────────────────────────────────────────────────
+/** Default OS workspace path — same location Twine uses for stories. */
+const DEFAULT_WORKSPACE = path.join(
+  os.homedir(),
+  'Documents',
+  'Twine',
+  'Stories',
+);
+
+// ─── Text input (readline) ────────────────────────────────────────────────────
 
 /**
- * Ask the user to choose from a numbered list of options.
- * Works on all platforms without raw mode or special key handling.
+ * Prompt the user for a path with a pre-filled default.
+ * Pressing Enter with no input accepts the default.
+ * readline is fully closed before returning so raw mode can open after.
  *
- * @param prompt - Question shown above the options
- * @param options - Array of option label strings
- * @returns Zero-based index of the selected option
+ * @param label   - Short label shown before the bracketed default
+ * @param default_ - Default value shown in brackets
+ * @returns Entered string, or the default if blank
  */
-async function askMenu(
-  prompt: string,
-  options: string[],
-): Promise<number> {
+async function askPath(label: string, default_: string): Promise<string> {
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
   });
-
-  console.log(`\n  ${bold(prompt)}`);
-  options.forEach((opt, i) => {
-    console.log(`    ${cyan(String(i + 1))}) ${opt}`);
-  });
-
   return new Promise((resolve) => {
-    const ask = () => {
-      rl.question(
-        `  Enter number (1-${options.length}): `,
-        (answer) => {
-          const n = parseInt(answer.trim(), 10);
-          if (n >= 1 && n <= options.length) {
-            rl.close();
-            resolve(n - 1);
-          } else {
-            console.log(
-              `  ${yellow('⚠')} Please enter a number between ` +
-              `1 and ${options.length}.`,
-            );
-            ask();
-          }
-        },
-      );
-    };
-    ask();
+    rl.question(
+      `  ${bold(label)} ${dim(`[${default_}]`)}: `,
+      (answer) => {
+        rl.close();
+        resolve(answer.trim() || default_);
+      },
+    );
   });
 }
 
+// ─── Arrow-key select menu ────────────────────────────────────────────────────
+
 /**
- * Ask the user a free-text question.
+ * Render an arrow-key selector using raw stdin.
+ * Must only be called after any readline interfaces are fully closed.
  *
- * @param prompt - Question text
- * @returns Trimmed answer string
+ * @param prompt  - Label shown above options
+ * @param options - Array of option strings
+ * @returns Zero-based index of the selected option
  */
-async function askText(prompt: string): Promise<string> {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
+async function selectMenu(
+  prompt: string,
+  options: string[],
+): Promise<number> {
   return new Promise((resolve) => {
-    rl.question(`  ${bold(prompt)}: `, (answer) => {
-      rl.close();
-      resolve(answer.trim());
-    });
+    let idx = 0;
+
+    const render = (first = false) => {
+      if (!first) {
+        process.stdout.write(`\x1b[${options.length + 1}A\x1b[J`);
+      }
+      console.log(`\n  ${bold(prompt)}`);
+      for (let i = 0; i < options.length; i++) {
+        const arrow = i === idx ? cyan('❯') : ' ';
+        const label = i === idx ? bold(options[i]) : dim(options[i]);
+        console.log(`    ${arrow} ${label}`);
+      }
+    };
+
+    render(true);
+
+    const stdin = process.stdin;
+    if (stdin.isTTY) stdin.setRawMode(true);
+    readline.emitKeypressEvents(stdin);
+
+    const onKey = (
+      _str: string | undefined,
+      key: { name: string; ctrl: boolean } | undefined,
+    ) => {
+      if (!key) return;
+      if (key.ctrl && key.name === 'c') {
+        if (stdin.isTTY) stdin.setRawMode(false);
+        console.log('\n\n  Setup cancelled.');
+        process.exit(1);
+      }
+      switch (key.name) {
+        case 'up':
+          idx = (idx - 1 + options.length) % options.length;
+          render();
+          break;
+        case 'down':
+          idx = (idx + 1) % options.length;
+          render();
+          break;
+        case 'return':
+          if (stdin.isTTY) stdin.setRawMode(false);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          stdin.off('keypress', onKey as any);
+          process.stdout.write('\n');
+          resolve(idx);
+          break;
+      }
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    stdin.on('keypress', onKey as any);
   });
 }
 
@@ -213,45 +251,32 @@ export async function runSetup(): Promise<void> {
   );
   console.log(dim('  MCP server for Twine interactive story authoring\n'));
 
-  // 1. Ask for the workspace directory
+  // 1. Workspace directory — readline must close before raw mode opens
   console.log(
-    '  Point TWINE_PROJECT at the folder that contains your game projects.\n' +
-    dim('  It can be a single game folder or a workspace with multiple games.\n') +
-    dim('  Supports ~ and %APPDATA% style paths.\n'),
+    dim('  Where are your Twine game projects? Press Enter to use the default.') +
+    dim(' You can change this later.\n'),
   );
 
-  let workspacePath = await askText(
-    'Workspace directory (e.g. ~/Documents/games)',
-  );
-  console.log();
-
-  if (!workspacePath) {
-    console.log(
-      `  ${yellow('⚠')} No path entered. ` +
-      `You can set TWINE_PROJECT manually in the MCP config.\n`,
-    );
-  } else {
-    try {
-      workspacePath = expandPath(workspacePath);
-      if (!fs.existsSync(workspacePath)) {
-        console.log(
-          `  ${yellow('⚠')} Path does not exist yet: ${bold(workspacePath)}\n` +
-          `     It will be created when you run create_project.\n`,
-        );
-      } else {
-        console.log(`  ${green('✓')} ${bold(workspacePath)}\n`);
-      }
-    } catch {
-      console.log(
-        `  ${yellow('⚠')} Could not resolve path — ` +
-        `stored as-is: ${workspacePath}\n`,
-      );
-    }
+  const rawPath = await askPath('Games folder', DEFAULT_WORKSPACE);
+  let workspacePath: string;
+  try {
+    workspacePath = expandPath(rawPath);
+  } catch {
+    workspacePath = rawPath;
   }
 
-  // 2. Select editor
+  if (!fs.existsSync(workspacePath)) {
+    console.log(
+      `\n  ${yellow('⚠')}  ${bold(workspacePath)} doesn't exist yet — ` +
+      `it will be created when you run ${cyan('create_project')}.\n`,
+    );
+  } else {
+    console.log(`\n  ${green('✓')} ${bold(workspacePath)}\n`);
+  }
+
+  // 2. Editor — arrow-key menu (raw mode, safe because readline is closed)
   const clients = getClients();
-  const clientIdx = await askMenu(
+  const clientIdx = await selectMenu(
     'Which editor or coding interface are you setting up?',
     clients.map((c) => c.label),
   );
@@ -259,18 +284,18 @@ export async function runSetup(): Promise<void> {
   console.log(`\n  ${green('✓')} ${bold(client.label)} selected\n`);
 
   // 3. Build the config block
-  const env: Record<string, string> = workspacePath
-    ? { TWINE_PROJECT: workspacePath }
-    : {};
-  const mcpBlock: Record<string, unknown> = { command: 'twine-mcp', env };
+  const mcpBlock: Record<string, unknown> = {
+    command: 'twine-mcp',
+    env: { TWINE_PROJECT: workspacePath },
+  };
   const snippet = JSON.stringify({ mcpServers: { twine: mcpBlock } }, null, 2);
 
-  // 4. Auto-write or manual clipboard
-  const writeIdx = await askMenu(
-    'How would you like to configure?',
+  // 4. Write method — arrow-key menu
+  const writeIdx = await selectMenu(
+    'How would you like to apply the config?',
     [
       `Auto   — write directly to ${client.hint}`,
-      `Manual — copy config block to clipboard`,
+      `Manual — copy config snippet to clipboard`,
     ],
   );
   console.log();
@@ -292,8 +317,8 @@ export async function runSetup(): Promise<void> {
     const copied = copyToClipboard(snippet);
     console.log(
       copied
-        ? `  ${green('✓')} Config block copied to clipboard!`
-        : `  ${yellow('⚠')} Clipboard unavailable — see block below.`,
+        ? `  ${green('✓')} Config snippet copied to clipboard!`
+        : `  ${yellow('⚠')} Clipboard unavailable — see snippet below.`,
     );
     console.log(
       `\n  Paste into ${bold(client.hint)} under ${bold('"mcpServers"')}:\n`,
