@@ -52,11 +52,13 @@ async function selectMenu(
   return new Promise((resolve) => {
     let idx = 0;
 
+    const lineCount = options.length + 1;
+
     const render = (first = false) => {
       if (!first) {
-        process.stdout.write(`\x1b[${options.length + 1}A\x1b[J`);
+        process.stdout.write(`\x1b[${lineCount}A\x1b[J`);
       }
-      console.log(`\n  ${bold(prompt)}`);
+      console.log(`  ${bold(prompt)}`);
       for (let i = 0; i < options.length; i++) {
         const arrow = i === idx ? cyan('❯') : ' ';
         const label = i === idx ? bold(options[i]) : dim(options[i]);
@@ -258,28 +260,17 @@ export async function runSetup(): Promise<void> {
   );
   console.log(dim('  MCP server for Twine interactive story authoring\n'));
   console.log(dim('  You can update any of these settings later in your MCP config.\n'));
-
-  // 1. Workspace path — pure arrow-key menu, no readline yet
-  const pathChoice = await selectMenu(
-    'Games folder — where your Twine projects live',
-    [
-      `Use default  —  ${DEFAULT_WORKSPACE}`,
-      'Enter a different path...',
-    ],
+  console.log(
+    dim('  Where are your Twine game projects? Press Enter for the default.\n'),
   );
 
-  let workspacePath = DEFAULT_WORKSPACE;
-  // Only opens readline if user explicitly asks for a custom path.
-  // The next selectMenu uses delayMs=50 to flush any buffered stdin events.
-  let usedReadline = false;
-  if (pathChoice === 1) {
-    usedReadline = true;
-    const raw = await askPath('Custom path', DEFAULT_WORKSPACE);
-    try {
-      workspacePath = expandPath(raw);
-    } catch {
-      workspacePath = raw;
-    }
+  // 1. Workspace path — readline first; delayMs on next menu flushes stdin
+  const rawPath = await askPath('Games folder', DEFAULT_WORKSPACE);
+  let workspacePath: string;
+  try {
+    workspacePath = expandPath(rawPath);
+  } catch {
+    workspacePath = rawPath;
   }
 
   if (!fs.existsSync(workspacePath)) {
@@ -291,12 +282,13 @@ export async function runSetup(): Promise<void> {
     console.log(`\n  ${green('✓')} ${bold(workspacePath)}`);
   }
 
-  // 2. Editor — delay only if we used readline above
+  // 2. Editor — delayMs flushes Enter from readline before raw mode
+  console.log();
   const clients = getClients();
   const clientIdx = await selectMenu(
     'Which editor or coding interface are you setting up?',
     clients.map((c) => c.label),
-    usedReadline ? 50 : 0,
+    50,
   );
   const client = clients[clientIdx];
   console.log(`\n  ${green('✓')} ${bold(client.label)} selected`);
@@ -308,7 +300,8 @@ export async function runSetup(): Promise<void> {
   };
   const snippet = JSON.stringify({ mcpServers: { twine: mcpBlock } }, null, 2);
 
-  // 4. Write method — no delay (previous was selectMenu, cleanup is clean)
+  // 4. Write method — menu-to-menu, no delay needed
+  console.log();
   const writeIdx = await selectMenu(
     'How would you like to apply the config?',
     [
