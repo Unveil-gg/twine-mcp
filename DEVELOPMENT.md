@@ -107,7 +107,7 @@ npm test             # vitest
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `ci.yml` | Push/PR to `main` | Lint, build, and test |
+| `ci.yml` | Push/PR to `main` | Lint, build, and test; open issue on failure |
 | `publish.yml` | Push tag `v*` | Build, test, publish to npm; open issue on failure |
 
 ---
