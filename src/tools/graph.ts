@@ -13,6 +13,7 @@ import {
   shortestPath,
 } from '../util/graph-algos.js';
 import { ok, err } from './stories.js';
+import { storyNotFoundMsg, passageNotFoundMsg } from '../util/errors.js';
 
 /**
  * Registers all graph analysis tools on the MCP server.
@@ -46,7 +47,7 @@ export function registerGraphTools(
     },
     async ({ story, compact }) => {
       const full = store.getStoryFull(story);
-      if (!full) return err(`Story "${story}" not found.`);
+      if (!full) return err(storyNotFoundMsg(story, store));
       const graph = buildLinkGraph(full);
 
       if (!compact) return ok(graph);
@@ -82,7 +83,7 @@ export function registerGraphTools(
     },
     async ({ story }) => {
       const full = store.getStoryFull(story);
-      if (!full) return err(`Story "${story}" not found.`);
+      if (!full) return err(storyNotFoundMsg(story, store));
       const names = new Set(full.passages.map((p) => p.name));
       const broken = full.passages.flatMap((p) =>
         p.links
@@ -113,7 +114,7 @@ export function registerGraphTools(
     },
     async ({ story, ending_tag }) => {
       const full = store.getStoryFull(story);
-      if (!full) return err(`Story "${story}" not found.`);
+      if (!full) return err(storyNotFoundMsg(story, store));
       const deadEnds = full.passages
         .filter(
           (p) =>
@@ -138,7 +139,7 @@ export function registerGraphTools(
     },
     async ({ story }) => {
       const full = store.getStoryFull(story);
-      if (!full) return err(`Story "${story}" not found.`);
+      if (!full) return err(storyNotFoundMsg(story, store));
       const graph = buildLinkGraph(full);
       const referenced = new Set<string>(
         Object.values(graph).flat(),
@@ -165,7 +166,7 @@ export function registerGraphTools(
     },
     async ({ story }) => {
       const full = store.getStoryFull(story);
-      if (!full) return err(`Story "${story}" not found.`);
+      if (!full) return err(storyNotFoundMsg(story, store));
       const graph = buildLinkGraph(full);
       const cycles = findCycles(graph);
       return ok({ count: cycles.length, cycles });
@@ -187,7 +188,7 @@ export function registerGraphTools(
     },
     async ({ story, from, to }) => {
       const full = store.getStoryFull(story);
-      if (!full) return err(`Story "${story}" not found.`);
+      if (!full) return err(storyNotFoundMsg(story, store));
       const graph = buildLinkGraph(full);
       const path = shortestPath(graph, from, to);
       return ok({ from, to, path, length: path ? path.length - 1 : null });
@@ -213,11 +214,11 @@ export function registerGraphTools(
     },
     async ({ story, from }) => {
       const full = store.getStoryFull(story);
-      if (!full) return err(`Story "${story}" not found.`);
+      if (!full) return err(storyNotFoundMsg(story, store));
       const graph = buildLinkGraph(full);
       const start = from ?? full.startPassage;
       if (!graph[start] && !full.passages.some((p) => p.name === start)) {
-        return err(`Passage "${start}" not found.`);
+        return err(passageNotFoundMsg(start, story, full.passages));
       }
       const reachable = reachableFrom(graph, start);
       const allNames = full.passages.map((p) => p.name);

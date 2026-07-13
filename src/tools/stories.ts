@@ -6,6 +6,7 @@
 import * as z from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { IStoryStore } from '../types.js';
+import { storyNotFoundMsg } from '../util/errors.js';
 
 /**
  * Registers all story-management tools on the MCP server.
@@ -80,7 +81,7 @@ export function registerStoryTools(
     },
     async ({ name, include_passages, compact }) => {
       const story = store.getStoryFull(name);
-      if (!story) return err(`Story "${name}" not found.`);
+      if (!story) return err(storyNotFoundMsg(name, store));
       if (!include_passages) {
         const { passages: _, ...meta } = story;
         return ok(meta);
@@ -143,7 +144,7 @@ export function registerStoryTools(
     },
     async ({ name }) => {
       const deleted = store.deleteStory(name);
-      if (!deleted) return err(`Story "${name}" not found.`);
+      if (!deleted) return err(storyNotFoundMsg(name, store));
       return ok({ deleted: name });
     },
   );
@@ -161,7 +162,7 @@ export function registerStoryTools(
     },
     async ({ name }) => {
       const storyObj = store.getStoryObject(name);
-      if (!storyObj) return err(`Story "${name}" not found.`);
+      if (!storyObj) return err(storyNotFoundMsg(name, store));
       return {
         content: [{ type: 'text' as const, text: storyObj.toTwee() }],
       };

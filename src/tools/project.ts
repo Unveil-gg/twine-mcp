@@ -21,6 +21,7 @@ import {
 import type { WorkspaceStore } from '../workspace-store.js';
 import { resolveFormat, DEFAULT_FORMAT_VERSIONS } from '../format-manager.js';
 import { ok, err } from './stories.js';
+import { storyNotFoundMsg, passageNotFoundMsg } from '../util/errors.js';
 import type { ValidationIssue } from '../types.js';
 
 /** Special passage names that carry story metadata. */
@@ -149,7 +150,7 @@ export function registerProjectTools(
     },
     async ({ story }) => {
       const full = workspace.getStoryFull(story);
-      if (!full) return err(`Story "${story}" not found.`);
+      if (!full) return err(storyNotFoundMsg(story, workspace));
 
       const issues: ValidationIssue[] = [];
       const names = new Set(full.passages.map((p) => p.name));
@@ -211,9 +212,9 @@ export function registerProjectTools(
     },
     async ({ story, output_path }) => {
       const ps = workspace.getProjectStore(story);
-      if (!ps) return err(`Story "${story}" not found.`);
+      if (!ps) return err(storyNotFoundMsg(story, workspace));
       const storyObj = ps.getStoryObject(story);
-      if (!storyObj) return err(`Story "${story}" not found.`);
+      if (!storyObj) return err(storyNotFoundMsg(story, workspace));
 
       const format = storyObj.format || 'Harlowe';
       const version = storyObj.formatVersion || undefined;
@@ -381,11 +382,13 @@ export function registerProjectTools(
     },
     async ({ story, passage, target_file }) => {
       const ps = workspace.getProjectStore(story);
-      if (!ps) return err(`Story "${story}" not found.`);
+      if (!ps) return err(storyNotFoundMsg(story, workspace));
       const storyObj = ps.getStoryObject(story);
-      if (!storyObj) return err(`Story "${story}" not found.`);
+      if (!storyObj) return err(storyNotFoundMsg(story, workspace));
       if (!storyObj.getPassageByName(passage)) {
-        return err(`Passage "${passage}" not found.`);
+        return err(
+          passageNotFoundMsg(passage, story, storyObj.passages as Passage[]),
+        );
       }
 
       const absTarget = path.isAbsolute(target_file)
@@ -419,7 +422,7 @@ export function registerProjectTools(
     },
     async ({ story }) => {
       const ps = workspace.getProjectStore(story);
-      if (!ps) return err(`Story "${story}" not found.`);
+      if (!ps) return err(storyNotFoundMsg(story, workspace));
       const files = ps.listFiles();
       return ok({
         projectRoot: ps.projectRoot,
@@ -451,9 +454,9 @@ export function registerProjectTools(
     },
     async ({ story, output_path }) => {
       const ps = workspace.getProjectStore(story);
-      if (!ps) return err(`Story "${story}" not found.`);
+      if (!ps) return err(storyNotFoundMsg(story, workspace));
       const storyObj = ps.getStoryObject(story);
-      if (!storyObj) return err(`Story "${story}" not found.`);
+      if (!storyObj) return err(storyNotFoundMsg(story, workspace));
 
       const archiveHtml = storyObj.toTwine2HTML();
       const wrapped =

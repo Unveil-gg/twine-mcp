@@ -11,6 +11,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Passage } from 'extwee';
 import type { IStoryStore } from '../types.js';
 import { ok, err } from './stories.js';
+import { storyNotFoundMsg, passageNotFoundMsg } from '../util/errors.js';
 
 /**
  * Registers split_passage and merge_passages tools on the MCP server.
@@ -60,11 +61,13 @@ export function registerRefactorTools(
       new_passage_tags,
     }) => {
       const storyObj = store.getStoryObject(story);
-      if (!storyObj) return err(`Story "${story}" not found.`);
+      if (!storyObj) return err(storyNotFoundMsg(story, store));
 
       const target = storyObj.getPassageByName(passage) as Passage | undefined;
       if (!target) {
-        return err(`Passage "${passage}" not found in "${story}".`);
+        return err(
+          passageNotFoundMsg(passage, story, storyObj.passages as Passage[]),
+        );
       }
       if (storyObj.getPassageByName(new_passage_name)) {
         return err(
@@ -143,17 +146,25 @@ export function registerRefactorTools(
     },
     async ({ story, keep_passage, remove_passage, separator }) => {
       const storyObj = store.getStoryObject(story);
-      if (!storyObj) return err(`Story "${story}" not found.`);
+      if (!storyObj) return err(storyNotFoundMsg(story, store));
 
       const keepP = storyObj.getPassageByName(keep_passage) as
         | Passage | undefined;
       if (!keepP) {
-        return err(`Passage "${keep_passage}" not found in "${story}".`);
+        return err(
+          passageNotFoundMsg(
+            keep_passage, story, storyObj.passages as Passage[],
+          ),
+        );
       }
       const removeP = storyObj.getPassageByName(remove_passage) as
         | Passage | undefined;
       if (!removeP) {
-        return err(`Passage "${remove_passage}" not found in "${story}".`);
+        return err(
+          passageNotFoundMsg(
+            remove_passage, story, storyObj.passages as Passage[],
+          ),
+        );
       }
       if (keep_passage === remove_passage) {
         return err('keep_passage and remove_passage must be different.');

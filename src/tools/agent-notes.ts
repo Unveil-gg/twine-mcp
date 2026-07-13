@@ -14,6 +14,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod/v4';
 import type { IStoryStore } from '../types.js';
 import { ok, err } from './stories.js';
+import { storyNotFoundMsg } from '../util/errors.js';
 
 const NOTES_FILENAME = '.agent-notes.md';
 
@@ -52,7 +53,7 @@ export function registerAgentNotesTools(
     },
     async ({ story }) => {
       const root = store.getProjectRoot?.(story) ?? null;
-      if (root === null) return err(`Story "${story}" not found.`);
+      if (root === null) return err(storyNotFoundMsg(story, store));
 
       const filePath = notesPath(root);
       if (!fs.existsSync(filePath)) {
@@ -91,7 +92,7 @@ export function registerAgentNotesTools(
     },
     async ({ story, content }) => {
       const root = store.getProjectRoot?.(story) ?? null;
-      if (root === null) return err(`Story "${story}" not found.`);
+      if (root === null) return err(storyNotFoundMsg(story, store));
 
       fs.writeFileSync(notesPath(root), content, 'utf-8');
       return ok({ updated: true, charCount: content.length });

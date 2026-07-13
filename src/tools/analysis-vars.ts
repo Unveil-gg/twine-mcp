@@ -9,6 +9,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { IStoryStore } from '../types.js';
 import { getFormatHints } from '../util/format-hints.js';
 import { ok, err } from './stories.js';
+import { storyNotFoundMsg } from '../util/errors.js';
 import type { VarUsage } from '../types.js';
 
 /**
@@ -41,7 +42,7 @@ export function registerAnalysisVarTools(
     },
     async ({ story, variable }) => {
       const full = store.getStoryFull(story);
-      if (!full) return err(`Story "${story}" not found.`);
+      if (!full) return err(storyNotFoundMsg(story, store));
 
       const hints = getFormatHints(full.format);
       const usageMap = new Map<string, VarUsage>();
@@ -112,7 +113,7 @@ export function registerAnalysisVarTools(
     },
     async ({ story, rare_threshold }) => {
       const full = store.getStoryFull(story);
-      if (!full) return err(`Story "${story}" not found.`);
+      if (!full) return err(storyNotFoundMsg(story, store));
 
       const tagCounts: Record<string, number> = {};
       for (const p of full.passages) {

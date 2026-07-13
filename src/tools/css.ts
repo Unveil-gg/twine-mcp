@@ -16,6 +16,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Passage } from 'extwee';
 import type { IStoryStore } from '../types.js';
 import { ok, err } from './stories.js';
+import { storyNotFoundMsg } from '../util/errors.js';
 import { getStylesheetPassage } from '../util/format-hints.js';
 import type { PassageFull } from '../types.js';
 
@@ -62,7 +63,7 @@ export function registerCssTools(
     },
     async ({ story }) => {
       const full = store.getStoryFull(story);
-      if (!full) return err(`Story "${story}" not found.`);
+      if (!full) return err(storyNotFoundMsg(story, store));
 
       const info = getStylesheetPassage(full.format);
       const passage = findStylesheetPassage(full.passages, full.format);
@@ -103,11 +104,11 @@ export function registerCssTools(
     },
     async ({ story, css, mode }) => {
       const full = store.getStoryFull(story);
-      if (!full) return err(`Story "${story}" not found.`);
+      if (!full) return err(storyNotFoundMsg(story, store));
 
       const info = getStylesheetPassage(full.format);
       const storyObj = store.getStoryObject(story);
-      if (!storyObj) return err(`Story "${story}" not found.`);
+      if (!storyObj) return err(storyNotFoundMsg(story, store));
 
       const existing = findStylesheetPassage(full.passages, full.format);
 

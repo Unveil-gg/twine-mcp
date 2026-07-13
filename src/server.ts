@@ -34,6 +34,7 @@ import { registerCssTools } from './tools/css.js';
 import { registerProjectTools } from './tools/project.js';
 import { registerRefactorTools } from './tools/refactor.js';
 import { registerAgentNotesTools } from './tools/agent-notes.js';
+import { storyNotFoundMsg } from './util/errors.js';
 import { listCachedFormats } from './format-manager.js';
 import { VERSION } from './version.js';
 
@@ -151,7 +152,7 @@ async function main(): Promise<void> {
     },
     async ({ story, updates }) => {
       const storyObj = store.getStoryObject(story);
-      if (!storyObj) return err(`Story "${story}" not found.`);
+      if (!storyObj) return err(storyNotFoundMsg(story, store));
       const applied: string[] = [];
       const failed: string[] = [];
 

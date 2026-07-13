@@ -8,6 +8,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Passage } from 'extwee';
 import type { IStoryStore } from '../types.js';
 import { ok, err } from './stories.js';
+import { storyNotFoundMsg, passageNotFoundMsg } from '../util/errors.js';
 
 /**
  * Registers all passage CRUD tools on the MCP server.
@@ -54,7 +55,7 @@ export function registerPassageTools(
     },
     async ({ story, fields, tag_filter }) => {
       const full = store.getStoryFull(story);
-      if (!full) return err(`Story "${story}" not found.`);
+      if (!full) return err(storyNotFoundMsg(story, store));
 
       let passages = full.passages;
       if (tag_filter) {
@@ -93,9 +94,11 @@ export function registerPassageTools(
     },
     async ({ story, passage }) => {
       const full = store.getStoryFull(story);
-      if (!full) return err(`Story "${story}" not found.`);
+      if (!full) return err(storyNotFoundMsg(story, store));
       const p = full.passages.find((x) => x.name === passage);
-      if (!p) return err(`Passage "${passage}" not found in "${story}".`);
+      if (!p) {
+        return err(passageNotFoundMsg(passage, story, full.passages));
+      }
       return ok(p);
     },
   );
@@ -126,7 +129,7 @@ export function registerPassageTools(
     },
     async ({ story, name, text, tags, position }) => {
       const storyObj = store.getStoryObject(story);
-      if (!storyObj) return err(`Story "${story}" not found.`);
+      if (!storyObj) return err(storyNotFoundMsg(story, store));
       if (storyObj.getPassageByName(name)) {
         return err(`Passage "${name}" already exists in "${story}".`);
       }
@@ -162,10 +165,12 @@ export function registerPassageTools(
     },
     async ({ story, passage, text, tags, position }) => {
       const storyObj = store.getStoryObject(story);
-      if (!storyObj) return err(`Story "${story}" not found.`);
+      if (!storyObj) return err(storyNotFoundMsg(story, store));
       const p = storyObj.getPassageByName(passage) as Passage | undefined;
       if (!p) {
-        return err(`Passage "${passage}" not found in "${story}".`);
+        return err(
+          passageNotFoundMsg(passage, story, storyObj.passages as Passage[]),
+        );
       }
       if (text !== undefined) p.text = text;
       if (tags !== undefined) p.tags = tags;
@@ -191,9 +196,11 @@ export function registerPassageTools(
     },
     async ({ story, passage }) => {
       const storyObj = store.getStoryObject(story);
-      if (!storyObj) return err(`Story "${story}" not found.`);
+      if (!storyObj) return err(storyNotFoundMsg(story, store));
       if (!storyObj.getPassageByName(passage)) {
-        return err(`Passage "${passage}" not found in "${story}".`);
+        return err(
+          passageNotFoundMsg(passage, story, storyObj.passages as Passage[]),
+        );
       }
       storyObj.removePassageByName(passage);
       store.saveStory(storyObj);
@@ -216,12 +223,14 @@ export function registerPassageTools(
     },
     async ({ story, old_name, new_name }) => {
       const storyObj = store.getStoryObject(story);
-      if (!storyObj) return err(`Story "${story}" not found.`);
+      if (!storyObj) return err(storyNotFoundMsg(story, store));
       const target = storyObj.getPassageByName(old_name) as
         | Passage
         | undefined;
       if (!target) {
-        return err(`Passage "${old_name}" not found in "${story}".`);
+        return err(
+          passageNotFoundMsg(old_name, story, storyObj.passages as Passage[]),
+        );
       }
       if (storyObj.getPassageByName(new_name)) {
         return err(
@@ -307,9 +316,11 @@ export function registerPassageTools(
     },
     async ({ story, passage }) => {
       const storyObj = store.getStoryObject(story);
-      if (!storyObj) return err(`Story "${story}" not found.`);
+      if (!storyObj) return err(storyNotFoundMsg(story, store));
       if (!storyObj.getPassageByName(passage)) {
-        return err(`Passage "${passage}" not found in "${story}".`);
+        return err(
+          passageNotFoundMsg(passage, story, storyObj.passages as Passage[]),
+        );
       }
       storyObj.start = passage;
       store.saveStory(storyObj);

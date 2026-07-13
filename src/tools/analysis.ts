@@ -10,6 +10,7 @@ import type { IStoryStore } from '../types.js';
 import { buildLinkGraph } from '../story-store.js';
 import { findCycles, reachableFrom } from '../util/graph-algos.js';
 import { ok, err } from './stories.js';
+import { storyNotFoundMsg } from '../util/errors.js';
 import type { AnalysisReport, BrokenLink } from '../types.js';
 
 /**
@@ -38,7 +39,7 @@ export function registerAnalysisTools(
     },
     async ({ story }) => {
       const full = store.getStoryFull(story);
-      if (!full) return err(`Story "${story}" not found.`);
+      if (!full) return err(storyNotFoundMsg(story, store));
       const graph = buildLinkGraph(full);
       const names = new Set(full.passages.map((p) => p.name));
 
@@ -125,7 +126,7 @@ export function registerAnalysisTools(
     },
     async ({ story }) => {
       const full = store.getStoryFull(story);
-      if (!full) return err(`Story "${story}" not found.`);
+      if (!full) return err(storyNotFoundMsg(story, store));
 
       const totalWords = full.passages.reduce(
         (s, p) => s + p.wordCount,
@@ -186,7 +187,7 @@ export function registerAnalysisTools(
     },
     async ({ story, query, search_in, tag_filter }) => {
       const full = store.getStoryFull(story);
-      if (!full) return err(`Story "${story}" not found.`);
+      if (!full) return err(storyNotFoundMsg(story, store));
       const lq = query.toLowerCase();
 
       const matches = full.passages

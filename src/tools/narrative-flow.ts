@@ -16,6 +16,7 @@ import {
   upstreamPaths,
 } from '../util/graph-algos.js';
 import { ok, err } from './stories.js';
+import { storyNotFoundMsg, passageNotFoundMsg } from '../util/errors.js';
 
 /**
  * Registers flow/traversal narrative tools on the MCP server.
@@ -56,13 +57,13 @@ export function registerNarrativeFlowTools(
     },
     async ({ story, from, max_depth, max_passages }) => {
       const full = store.getStoryFull(story);
-      if (!full) return err(`Story "${story}" not found.`);
+      if (!full) return err(storyNotFoundMsg(story, store));
       const graph = buildLinkGraph(full);
       const start = from ?? full.startPassage;
       const passageMap = new Map(full.passages.map((p) => [p.name, p]));
 
       if (!passageMap.has(start)) {
-        return err(`Passage "${start}" not found.`);
+        return err(passageNotFoundMsg(start, story, full.passages));
       }
 
       const order = dfsOrdered(graph, start, max_depth, max_passages);
@@ -106,7 +107,7 @@ export function registerNarrativeFlowTools(
     },
     async ({ story, max_paths }) => {
       const full = store.getStoryFull(story);
-      if (!full) return err(`Story "${story}" not found.`);
+      if (!full) return err(storyNotFoundMsg(story, store));
       const graph = buildLinkGraph(full);
 
       const endings = full.passages.filter(
@@ -147,9 +148,9 @@ export function registerNarrativeFlowTools(
     },
     async ({ story, passage, max_upstream_paths }) => {
       const full = store.getStoryFull(story);
-      if (!full) return err(`Story "${story}" not found.`);
+      if (!full) return err(storyNotFoundMsg(story, store));
       const p = full.passages.find((x) => x.name === passage);
-      if (!p) return err(`Passage "${passage}" not found.`);
+      if (!p) return err(passageNotFoundMsg(passage, story, full.passages));
       const graph = buildLinkGraph(full);
       const paths = upstreamPaths(graph, passage, max_upstream_paths);
       const outgoing = p.links.map((l) => ({
@@ -191,7 +192,7 @@ export function registerNarrativeFlowTools(
     },
     async ({ story, min_choices }) => {
       const full = store.getStoryFull(story);
-      if (!full) return err(`Story "${story}" not found.`);
+      if (!full) return err(storyNotFoundMsg(story, store));
       const graph = buildLinkGraph(full);
 
       const order = dfsOrdered(graph, full.startPassage);
