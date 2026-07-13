@@ -143,7 +143,8 @@ export function registerProjectTools(
     {
       description:
         'Validate a story: checks for broken links, missing start passage, ' +
-        'IFID, and format. Run before build_story to catch issues early.',
+        'IFID, and format. ' +
+        'THEN: build_story (only when valid=true).',
       inputSchema: {
         story: z.string().describe('Story name'),
       },

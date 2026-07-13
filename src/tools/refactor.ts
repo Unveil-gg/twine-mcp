@@ -30,7 +30,8 @@ export function registerRefactorTools(
       description:
         'Split a passage into two passages at the specified line number. ' +
         'Inserts a [[new_passage_name]] link at the split point. ' +
-        'The second half becomes a new passage with the given name.',
+        'The second half becomes a new passage with the given name. ' +
+        'CALL FIRST: get_passage to inspect text and count lines.',
       inputSchema: {
         story: z.string().describe('Story name'),
         passage: z.string().describe('Passage name to split'),
@@ -126,7 +127,8 @@ export function registerRefactorTools(
       description:
         'Merge two passages into one. The content of the second passage is ' +
         'appended to the first. The direct link between them is removed. ' +
-        'All other links to the second passage are rewritten to the first.',
+        'All other links to the second passage are rewritten to the first. ' +
+        'CALL FIRST: get_passage on both passages to confirm content.',
       inputSchema: {
         story: z.string().describe('Story name'),
         keep_passage: z

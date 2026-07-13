@@ -6,6 +6,8 @@
  * get_story_branches) live in narrative-flow.ts.
  */
 
+import fs from 'fs';
+import path from 'path';
 import * as z from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { IStoryStore } from '../types.js';
@@ -36,7 +38,10 @@ export function registerNarrativeTools(
       description:
         'Return a minimal narrative snapshot of a story: title, format, ' +
         'passage count, start passage text, branch count, ending count, ' +
-        'and top issues. Designed to be the first and cheapest call (~500 tokens).',
+        'and top issues. ' +
+        'CALL FIRST each session for orientation (~500 tokens). ' +
+        'THEN: get_story_delta (if resuming) or get_story_context ' +
+        '(for deeper details).',
       inputSchema: {
         story: z.string().describe('Story name'),
       },
@@ -91,8 +96,9 @@ export function registerNarrativeTools(
       description:
         'Return a configurable bundle of story data for AI orientation. ' +
         'Use fields to select what to include; use compact=true to omit ' +
-        'full passage text. Recommended first call: ' +
-        'fields=["meta","issues"], compact=true (~200 tokens).',
+        'full passage text. ' +
+        'CALL AFTER: summarize_story. ' +
+        'Recommended: fields=["meta","issues"], compact=true (~200 tokens).',
       inputSchema: {
         story: z.string().describe('Story name'),
         fields: z
@@ -198,6 +204,85 @@ export function registerNarrativeTools(
       }
 
       return ok(result);
+    },
+  );
+
+  /** get_story_delta */
+  server.registerTool(
+    'get_story_delta',
+    {
+      description:
+        'Check what changed in a story since a given timestamp. Use the ' +
+        'lastModified value from get_agent_notes or a prior session. ' +
+        'If changed=false you can skip re-reading context. ' +
+        'CALL AFTER: get_agent_notes (use its lastModified as since).',
+      inputSchema: {
+        story: z.string().describe('Story name'),
+        since: z
+          .string()
+          .describe('ISO 8601 datetime — report changes after this point'),
+      },
+    },
+    async ({ story, since }) => {
+      const sinceDate = new Date(since);
+      if (isNaN(sinceDate.getTime())) {
+        return err(`Invalid "since" value: "${since}". Use ISO 8601.`);
+      }
+
+      const root = store.getProjectRoot?.(story) ?? null;
+      if (root === null) return err(storyNotFoundMsg(story, store));
+
+      const srcDir = path.join(root, 'src');
+      let allFiles: string[] = [];
+      try {
+        allFiles = (
+          fs.readdirSync(srcDir, { recursive: true }) as string[]
+        )
+          .filter((f) => f.endsWith('.twee') || f.endsWith('.tw'))
+          .map((f) => path.join(srcDir, f));
+      } catch {
+        return err(`Could not scan source directory for "${story}".`);
+      }
+
+      const changedFiles = allFiles.filter((f) => {
+        try { return fs.statSync(f).mtime > sinceDate; } catch { return false; }
+      });
+
+      const full = store.getStoryFull(story);
+      if (!full) return err(storyNotFoundMsg(story, store));
+
+      const changedSet = new Set(changedFiles);
+      const changedPassages = changedFiles.length > 0
+        ? full.passages
+            .filter((p) => {
+              const f = store.getPassageFile?.(p.name);
+              return f !== undefined && changedSet.has(f);
+            })
+            .map((p) => ({
+              name: p.name,
+              tags: p.tags,
+              wordCount: p.wordCount,
+              preview: p.preview,
+            }))
+        : [];
+
+      const lastModified = allFiles.length > 0
+        ? new Date(Math.max(...allFiles.map((f) => {
+            try { return fs.statSync(f).mtime.getTime(); } catch { return 0; }
+          }))).toISOString()
+        : since;
+
+      return ok({
+        changed: changedFiles.length > 0,
+        since,
+        lastModified,
+        changedFileCount: changedFiles.length,
+        changedFiles: changedFiles.map((f) => path.relative(root, f)),
+        passageCount: full.passageCount,
+        wordCount: full.wordCount,
+        changedPassageCount: changedPassages.length,
+        changedPassages,
+      });
     },
   );
 }

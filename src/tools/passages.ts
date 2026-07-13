@@ -86,7 +86,8 @@ export function registerPassageTools(
     'get_passage',
     {
       description:
-        'Get the full content, tags, and outgoing links of a single passage.',
+        'Get the full content, tags, and outgoing links of a single passage. ' +
+        'CALL BEFORE: update_passage, delete_passage, split_passage.',
       inputSchema: {
         story: z.string().describe('Story name'),
         passage: z.string().describe('Passage name'),
@@ -148,7 +149,8 @@ export function registerPassageTools(
     {
       description:
         'Edit a passage: update text, tags, and/or editor position. ' +
-        'Omit fields you do not want to change.',
+        'Omit fields you do not want to change. ' +
+        'CALL FIRST: get_passage to read current state before editing.',
       inputSchema: {
         story: z.string().describe('Story name'),
         passage: z.string().describe('Passage name'),
