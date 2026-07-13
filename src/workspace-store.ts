@@ -249,6 +249,10 @@ export class WorkspaceStore implements IStoryStore {
     }
   }
 
+  getProjectRoot(name: string): string | null {
+    return this.getProjectStore(name)?.projectRoot ?? null;
+  }
+
   listFiles(): FileEntry[] {
     return [];
   }

@@ -33,6 +33,7 @@ import { registerFormatTools } from './tools/formats.js';
 import { registerCssTools } from './tools/css.js';
 import { registerProjectTools } from './tools/project.js';
 import { registerRefactorTools } from './tools/refactor.js';
+import { registerAgentNotesTools } from './tools/agent-notes.js';
 import { listCachedFormats } from './format-manager.js';
 import { VERSION } from './version.js';
 
@@ -80,6 +81,7 @@ async function main(): Promise<void> {
   registerCssTools(server, store);
   registerRefactorTools(server, store);
   registerProjectTools(server, store);
+  registerAgentNotesTools(server, store);
 
   // ── Utility tools ────────────────────────────────────────────────────────────
 

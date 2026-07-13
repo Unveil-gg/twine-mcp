@@ -240,6 +240,10 @@ export class ProjectStore implements IStoryStore {
     this.passageFileMap.set(name, filePath);
   }
 
+  getProjectRoot(name: string): string | null {
+    return this.matchesStory(name) ? this.projectRoot : null;
+  }
+
   /**
    * List all source .twee files with passage and word counts.
    *

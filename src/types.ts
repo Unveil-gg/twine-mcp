@@ -111,6 +111,8 @@ export interface IStoryStore {
   setPassageFile?(name: string, filePath: string): void;
   /** List source files with passage stats. */
   listFiles?(): FileEntry[];
+  /** Return the filesystem project root for a given story name. */
+  getProjectRoot?(storyName: string): string | null;
   close?(): Promise<void>;
 }
 
