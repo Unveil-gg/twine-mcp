@@ -233,7 +233,7 @@ export function registerNarrativeTools(
       if (root === null) return err(storyNotFoundMsg(story, store));
 
       const srcDir = path.join(root, 'src');
-      let allFiles: string[] = [];
+      let allFiles: string[];
       try {
         allFiles = (
           fs.readdirSync(srcDir, { recursive: true }) as string[]
