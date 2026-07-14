@@ -164,4 +164,47 @@ describe('WorkspaceStore', () => {
 
     expect(store.listStories().map((s) => s.name)).toEqual(['Brand New Game']);
   });
+
+  it('listStories reports ifid/format/formatVersion/startPassage for a ' +
+    'freshly discovered project, before its ProjectStore is ever loaded', async () => {
+    const projectDir = path.join(tmpBase, 'fresh-game');
+    const srcDir = path.join(projectDir, 'src');
+    fs.mkdirSync(srcDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(srcDir, 'StoryData.twee'),
+      ':: StoryTitle\nFresh Game\n\n:: StoryData\n' +
+      '{\n  "ifid": "ABC-123",\n  "format": "Harlowe",\n' +
+      '  "format-version": "3.3.9",\n  "start": "Start",\n' +
+      '  "zoom": 1\n}\n',
+      'utf-8',
+    );
+    fs.writeFileSync(
+      path.join(srcDir, 'Start.twee'), ':: Start\nHi.\n', 'utf-8',
+    );
+
+    const store = new WorkspaceStore([tmpBase]);
+    await store.init();
+
+    const [meta] = store.listStories();
+    expect(meta.ifid).toBe('ABC-123');
+    expect(meta.format).toBe('Harlowe');
+    expect(meta.formatVersion).toBe('3.3.9');
+    expect(meta.startPassage).toBe('Start');
+    expect(meta.passageCount).toBe(3);
+  });
+
+  it('clientRootsSupported/clientRootsError default to false/null and ' +
+    'are updated by their setters', () => {
+    const store = new WorkspaceStore([tmpBase]);
+    expect(store.clientRootsSupported).toBe(false);
+    expect(store.clientRootsError).toBeNull();
+
+    store.setClientRootsSupported(true);
+    store.setClientRootsError('Method not found');
+    expect(store.clientRootsSupported).toBe(true);
+    expect(store.clientRootsError).toBe('Method not found');
+
+    store.setClientRootsError(null);
+    expect(store.clientRootsError).toBeNull();
+  });
 });

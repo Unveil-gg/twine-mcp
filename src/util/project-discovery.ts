@@ -68,18 +68,62 @@ export function readStoryName(projectRoot: string): string | null {
   return null;
 }
 
+/** Fields cheaply recoverable from the :: StoryData passage's JSON body. */
+interface StoryDataFields {
+  ifid?: string;
+  format?: string;
+  formatVersion?: string;
+  start?: string;
+}
+
 /**
- * Build a lightweight StoryMeta from directory scan alone.
- * Counts :: headers for passage count without full parsing.
+ * Cheaply extract ifid/format/format-version/start from a file's ::
+ * StoryData passage, without a full Twee parse. Reads only the JSON
+ * body between the `:: StoryData` header and the next `:: ` header
+ * (or end of file). Same source of truth as ProjectStore's toMeta(),
+ * just without merging passages/links.
+ *
+ * @param content - Raw text of a .twee/.tw file
+ * @returns Parsed StoryData fields, or null if this file has no
+ *   StoryData passage or its body isn't valid JSON
+ */
+function extractStoryData(content: string): StoryDataFields | null {
+  const header = content.match(/^:: StoryData\b[^\n]*\n/m);
+  if (!header) return null;
+  const bodyStart = (header.index ?? 0) + header[0].length;
+  const rest = content.slice(bodyStart);
+  const nextHeader = rest.search(/^:: /m);
+  const body = nextHeader === -1 ? rest : rest.slice(0, nextHeader);
+  try {
+    const data = JSON.parse(body.trim()) as Record<string, unknown>;
+    return {
+      ifid: typeof data['ifid'] === 'string' ? data['ifid'] : undefined,
+      format: typeof data['format'] === 'string' ? data['format'] : undefined,
+      formatVersion: typeof data['format-version'] === 'string'
+        ? data['format-version'] : undefined,
+      start: typeof data['start'] === 'string' ? data['start'] : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Build a lightweight StoryMeta from directory scan alone. Counts ::
+ * headers for passage count, and cheaply extracts ifid/format/
+ * formatVersion/startPassage from the StoryData passage's JSON body
+ * (regex-based, not a full Twee/passage-link parse).
  *
  * @param name - Story name to use
  * @param projectRoot - Root directory of the game project
- * @returns Lightweight StoryMeta (ifid/format fields are empty)
+ * @returns Lightweight StoryMeta (wordCount is always 0 — computing it
+ *   requires parsing every passage's text)
  */
 export function lightMeta(name: string, projectRoot: string): StoryMeta {
   const srcDir = path.join(projectRoot, 'src');
   let passageCount = 0;
   let lastModified = new Date(0).toISOString();
+  let storyData: StoryDataFields | null = null;
   try {
     const files = fs.readdirSync(srcDir).filter(
       (f) => f.endsWith('.twee') || f.endsWith('.tw'),
@@ -90,16 +134,17 @@ export function lightMeta(name: string, projectRoot: string): StoryMeta {
       passageCount += (content.match(/^:: /gm) ?? []).length;
       const mtime = fs.statSync(filePath).mtime.toISOString();
       if (mtime > lastModified) lastModified = mtime;
+      if (!storyData) storyData = extractStoryData(content);
     }
   } catch {
     // ignore
   }
   return {
     name,
-    ifid: '',
-    format: '',
-    formatVersion: '',
-    startPassage: '',
+    ifid: storyData?.ifid ?? '',
+    format: storyData?.format ?? '',
+    formatVersion: storyData?.formatVersion ?? '',
+    startPassage: storyData?.start ?? '',
     passageCount,
     wordCount: 0,
     filePath: projectRoot,

@@ -62,6 +62,8 @@ export function registerUtilityTools(
         version: VERSION,
         configuredWorkspaceRoots: store.configuredWorkspaceRoots,
         clientWorkspaceRoots: store.clientWorkspaceRoots,
+        clientRootsSupported: store.clientRootsSupported,
+        clientRootsError: store.clientRootsError,
         effectiveWorkspaceRoots: store.effectiveWorkspaceRoots,
         platform: process.platform,
         nodeVersion: process.version,
@@ -77,7 +79,10 @@ export function registerUtilityTools(
       description:
         'List the effective workspace roots being scanned for Twine ' +
         'projects: configured roots (config file / env vars) unioned ' +
-        'with any folders advertised by the MCP client.',
+        'with any folders advertised by the MCP client. clientRootsSupported ' +
+        '/ clientRootsError explain why clientWorkspaceRoots may be empty ' +
+        '(client does not support roots vs. the roots/list request failed ' +
+        'vs. the client genuinely has none open).',
       inputSchema: {},
     },
     async () => {
@@ -85,6 +90,8 @@ export function registerUtilityTools(
       return ok({
         configuredWorkspaceRoots: store.configuredWorkspaceRoots,
         clientWorkspaceRoots: store.clientWorkspaceRoots,
+        clientRootsSupported: store.clientRootsSupported,
+        clientRootsError: store.clientRootsError,
         effectiveWorkspaceRoots: store.effectiveWorkspaceRoots,
       });
     },

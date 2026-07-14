@@ -52,6 +52,8 @@ export class WorkspaceStore implements IStoryStore {
   private configuredRoots: string[];
   private clientRoots: string[] = [];
   private effectiveRoots: string[] = [];
+  private rootsSupported = false;
+  private rootsError: string | null = null;
 
   /** projectRoot → ProjectStore (lazy-loaded). */
   private readonly projects = new Map<string, ProjectStore>();
@@ -80,6 +82,31 @@ export class WorkspaceStore implements IStoryStore {
   /** union(configuredWorkspaceRoots, clientWorkspaceRoots), deduped. */
   get effectiveWorkspaceRoots(): string[] {
     return this.effectiveRoots;
+  }
+
+  /**
+   * True if the client advertised the `roots` capability at initialize.
+   * Does not guarantee roots/list works — some clients (e.g. Cursor, as
+   * of this writing) advertise support but error on the call; see
+   * clientRootsError for that case.
+   */
+  get clientRootsSupported(): boolean {
+    return this.rootsSupported;
+  }
+
+  /** Error from the most recent failed roots/list call, or null. */
+  get clientRootsError(): string | null {
+    return this.rootsError;
+  }
+
+  /** Record whether the client advertised `roots` at initialize. */
+  setClientRootsSupported(supported: boolean): void {
+    this.rootsSupported = supported;
+  }
+
+  /** Record (or clear, via null) the latest roots/list failure. */
+  setClientRootsError(message: string | null): void {
+    this.rootsError = message;
   }
 
   /**
