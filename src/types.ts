@@ -113,6 +113,12 @@ export interface IStoryStore {
   listFiles?(): FileEntry[];
   /** Return the filesystem project root for a given story name. */
   getProjectRoot?(storyName: string): string | null;
+  /**
+   * Re-scan the workspace for newly created/removed projects.
+   * Cheap directory listing only. Implemented by WorkspaceStore;
+   * a no-op for single-project stores.
+   */
+  rescan?(): void;
   close?(): Promise<void>;
 }
 

@@ -4,9 +4,13 @@
  *
  * Transport: stdio (default for Cursor, Claude Code, Claude Desktop)
  *
- * Environment variables:
- *   TWINE_PROJECT=/path/to/workspace  — required; workspace root that
- *                                       contains one or more game projects.
+ * Workspace roots (a Twee project may live under any of these):
+ *   - ~/.twine-mcp/config.json → { "workspaceRoots": [...] }
+ *   - TWINE_WORKSPACE_ROOTS=/a,/b  — comma/semicolon-separated list
+ *   - TWINE_PROJECT=/path          — legacy singular var (still works)
+ *   - Folders advertised by the MCP client itself, if it supports the
+ *     `roots` capability (e.g. the folder open in the editor). These
+ *     are additive to the above, never a replacement for them.
  *
  * Usage:
  *   npx @unveil-gg/twine-mcp
@@ -17,12 +21,12 @@ import { McpServer, ResourceTemplate } from
   '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from
   '@modelcontextprotocol/sdk/server/stdio.js';
-import * as z from 'zod/v4';
 
-import { requireWorkspaceRoot } from './config.js';
+import { resolveConfiguredRoots } from './config.js';
 import { WorkspaceStore } from './workspace-store.js';
 import { buildLinkGraph } from './story-store.js';
-import { registerStoryTools, ok, err } from './tools/stories.js';
+import { setupRootsCapability } from './util/roots-capability.js';
+import { registerStoryTools } from './tools/stories.js';
 import { registerPassageTools } from './tools/passages.js';
 import { registerGraphTools } from './tools/graph.js';
 import { registerAnalysisTools } from './tools/analysis.js';
@@ -34,8 +38,7 @@ import { registerCssTools } from './tools/css.js';
 import { registerProjectTools } from './tools/project.js';
 import { registerRefactorTools } from './tools/refactor.js';
 import { registerAgentNotesTools } from './tools/agent-notes.js';
-import { storyNotFoundMsg } from './util/errors.js';
-import { listCachedFormats } from './format-manager.js';
+import { registerUtilityTools } from './tools/utility.js';
 import { VERSION } from './version.js';
 
 async function main(): Promise<void> {
@@ -46,22 +49,22 @@ async function main(): Promise<void> {
     return;
   }
 
-  let workspaceRoot: string;
-  try {
-    workspaceRoot = requireWorkspaceRoot();
-  } catch (e) {
-    process.stderr.write(`[twine-mcp] ${String(e)}\n`);
-    process.exit(1);
-  }
-
-  const store = new WorkspaceStore(workspaceRoot);
+  const configuredRoots = resolveConfiguredRoots();
+  const store = new WorkspaceStore(configuredRoots);
   await store.init();
 
   const games = store.listStories();
   process.stderr.write(
-    `[twine-mcp] v${VERSION} — workspace: ${workspaceRoot} ` +
+    `[twine-mcp] v${VERSION} — configured roots: ` +
+    `${configuredRoots.length ? configuredRoots.join(', ') : '(none)'} ` +
     `(${games.length} game${games.length === 1 ? '' : 's'} found)\n`,
   );
+  if (configuredRoots.length === 0) {
+    process.stderr.write(
+      '[twine-mcp] no workspaceRoots configured — waiting for the ' +
+      'client to advertise its own roots (see the `roots` MCP capability)\n',
+    );
+  }
   if (games.length > 0) {
     process.stderr.write(
       `[twine-mcp] games: ${games.map((g) => g.name).join(', ')}\n`,
@@ -69,6 +72,9 @@ async function main(): Promise<void> {
   }
 
   const server = new McpServer({ name: 'twine-mcp', version: VERSION });
+
+  // ── MCP `roots` capability: pick up client-advertised folders ───────────────
+  setupRootsCapability(server.server, store);
 
   // ── Story / passage / analysis tools ────────────────────────────────────────
   registerStoryTools(server, store);
@@ -83,97 +89,7 @@ async function main(): Promise<void> {
   registerRefactorTools(server, store);
   registerProjectTools(server, store);
   registerAgentNotesTools(server, store);
-
-  // ── Utility tools ────────────────────────────────────────────────────────────
-
-  /** ping */
-  server.registerTool(
-    'ping',
-    {
-      description:
-        'Health check. Returns server version, workspace path, and ' +
-        'the list of discovered game projects.',
-      inputSchema: {},
-    },
-    async () => {
-      const stories = store.listStories();
-      return ok({
-        status: 'ok',
-        version: VERSION,
-        workspaceRoot,
-        games: stories.map((s) => ({
-          name: s.name,
-          passageCount: s.passageCount,
-          lastModified: s.lastModified,
-        })),
-        cachedFormats: listCachedFormats(),
-      });
-    },
-  );
-
-  /** get_config */
-  server.registerTool(
-    'get_config',
-    {
-      description: 'Return current server configuration.',
-      inputSchema: {},
-    },
-    async () =>
-      ok({
-        version: VERSION,
-        workspaceRoot,
-        platform: process.platform,
-        nodeVersion: process.version,
-        cachedFormats: listCachedFormats(),
-      }),
-  );
-
-  /** batch_update — atomic multi-passage edit */
-  server.registerTool(
-    'batch_update',
-    {
-      description:
-        'Apply multiple passage updates to a story in a single atomic save. ' +
-        'Specify text, tags, or position for each passage.',
-      inputSchema: {
-        story: z.string().describe('Story name'),
-        updates: z
-          .array(
-            z.object({
-              passage: z.string().describe('Passage name'),
-              text: z.string().optional(),
-              tags: z.array(z.string()).optional(),
-              position: z.string().optional(),
-            }),
-          )
-          .min(1)
-          .describe('List of passage updates to apply'),
-      },
-    },
-    async ({ story, updates }) => {
-      const storyObj = store.getStoryObject(story);
-      if (!storyObj) return err(storyNotFoundMsg(story, store));
-      const applied: string[] = [];
-      const failed: string[] = [];
-
-      for (const u of updates) {
-        const p = storyObj.getPassageByName(u.passage) as
-          | import('extwee').Passage | undefined;
-        if (!p) { failed.push(u.passage); continue; }
-        if (u.text !== undefined) p.text = u.text;
-        if (u.tags !== undefined) p.tags = u.tags;
-        if (u.position !== undefined) {
-          const meta = (p.metadata ?? {}) as Record<string, string>;
-          meta['position'] = u.position;
-          p.metadata = meta;
-        }
-        applied.push(u.passage);
-      }
-
-      if (applied.length > 0) store.saveStory(storyObj);
-      return ok({ applied, failed });
-    },
-  );
+  registerUtilityTools(server, store);
 
   // ── MCP Resources ─────────────────────────────────────────────────────────────
 

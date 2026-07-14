@@ -45,6 +45,7 @@ export function registerStoryTools(
       },
     },
     async ({ fields }) => {
+      store.rescan?.();
       const stories = store.listStories();
       const results = stories.map((s) => {
         if (!fields) return s;

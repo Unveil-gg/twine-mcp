@@ -129,3 +129,20 @@ TWINE_LIBRARY="~/Documents/Twine/Stories" npm start
 ```
 
 The server uses stdio transport — it will appear to hang in the terminal; that is normal. Your editor spawns it as a child process.
+
+---
+
+## Workspace roots
+
+twine-mcp scans one or more **workspace roots** for Twee projects. Roots can come from any combination of:
+
+- **`~/.twine-mcp/config.json`** — `{ "workspaceRoots": ["/path/a", "/path/b"] }`
+- **`TWINE_WORKSPACE_ROOTS`** env var — comma- or semicolon-separated paths
+- **`TWINE_PROJECT`** env var — legacy singular var, still supported, contributes one more root
+- **The MCP client's own folders** — if your client (Cursor, Claude Code, Codex, etc.) advertises the `roots` capability, the folder(s) it has open are added automatically. This works even if that folder was never listed in your config — for example, a repo you just opened with a freshly `create_project`-scaffolded game inside it.
+
+All of these are combined (unioned), not replaced — a client's open folder never hides your configured roots, and vice versa.
+
+Run `list_workspace_roots` (or `get_config`) at any time to see the exact set of roots being scanned. Discovery re-scans automatically on every `list_stories`/`get_config` call, and immediately after `create_project`/`import_from_twine` — no server restart needed. `rescan_workspace` is available if you want to trigger a re-scan explicitly.
+
+If the same story name is discovered under two different roots, `list_stories` will show both (differentiated by `filePath`), and tools that look a story up by name will raise a clear "ambiguous story name" error rather than silently picking one — rename one of the projects to resolve it.

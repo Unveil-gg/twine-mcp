@@ -18,7 +18,8 @@ import {
   compileTwine2HTML,
   generateIFID,
 } from 'extwee';
-import type { WorkspaceStore } from '../workspace-store.js';
+import { hasExistingTweeProject, type WorkspaceStore } from
+  '../workspace-store.js';
 import { resolveFormat, DEFAULT_FORMAT_VERSIONS } from '../format-manager.js';
 import { ok, err } from './stories.js';
 import { storyNotFoundMsg, passageNotFoundMsg } from '../util/errors.js';
@@ -66,13 +67,12 @@ export function registerProjectTools(
       },
     },
     async ({ project_dir, story_name, format, format_version }) => {
-      if (fs.existsSync(project_dir)) {
-        const items = fs.readdirSync(project_dir);
-        if (items.length > 0) {
-          return err(
-            `Directory "${project_dir}" already exists and is not empty.`,
-          );
-        }
+      if (fs.existsSync(project_dir) && hasExistingTweeProject(project_dir)) {
+        return err(
+          `Directory "${project_dir}" already contains a Twee project ` +
+          '(found StoryData.twee or src/*.twee). Refusing to overwrite ' +
+          'existing work.',
+        );
       }
 
       const srcDir = path.join(project_dir, 'src');
@@ -105,9 +105,10 @@ export function registerProjectTools(
       fs.writeFileSync(
         path.join(srcDir, 'Start.twee'), startContent, 'utf-8',
       );
-      fs.writeFileSync(
-        path.join(project_dir, '.gitignore'), gitignore, 'utf-8',
-      );
+      const gitignorePath = path.join(project_dir, '.gitignore');
+      if (!fs.existsSync(gitignorePath)) {
+        fs.writeFileSync(gitignorePath, gitignore, 'utf-8');
+      }
 
       // Download format JS in background (don't fail if offline)
       let formatCached = false;
@@ -117,6 +118,10 @@ export function registerProjectTools(
       } catch {
         // Will retry on next build_story call
       }
+
+      // Pick up the new project immediately, no restart required, even
+      // if project_dir isn't already covered by a workspace root.
+      workspace.adoptRoot(project_dir);
 
       return ok({
         projectDir: project_dir,
@@ -132,7 +137,7 @@ export function registerProjectTools(
           'dist/',
           'assets/',
         ],
-        note: 'Restart the MCP server so the new project is discovered.',
+        note: 'Project is now discoverable — call list_stories to confirm.',
       });
     },
   );
@@ -351,6 +356,10 @@ export function registerProjectTools(
         formatCached = true;
       } catch { /* retry on build */ }
 
+      // Pick up the new project immediately, no restart required, even
+      // if target_dir isn't already covered by a workspace root.
+      workspace.adoptRoot(target_dir);
+
       return ok({
         storyName: imported.name,
         format: imported.format,
@@ -358,7 +367,7 @@ export function registerProjectTools(
         passageCount: (imported.passages as Passage[]).length,
         filesWritten,
         formatCached,
-        note: 'Restart the MCP server so the new project is discovered.',
+        note: 'Project is now discoverable — call list_stories to confirm.',
       });
     },
   );

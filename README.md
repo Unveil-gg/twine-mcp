@@ -43,7 +43,7 @@ Add to your editor's MCP config (`~/.cursor/mcp.json`, `~/.claude.json`, etc.):
 }
 ```
 
-`TWINE_PROJECT` can point to a single game folder or a workspace containing multiple games. The server discovers all projects automatically.
+`TWINE_PROJECT` can point to a single game folder or a workspace containing multiple games. The server discovers all projects automatically, and supports multiple workspace roots at once — including the folder open in your editor. See [DEVELOPMENT.md](DEVELOPMENT.md#workspace-roots) for details.
 
 </details>
 
@@ -62,7 +62,7 @@ Add to your editor's MCP config (`~/.cursor/mcp.json`, `~/.claude.json`, etc.):
 | **Project** | `create_project`, `build_story`, `validate_story`, `import_from_twine`, `export_for_twine`, `move_passage`, `list_files` |
 | **Formats** | `list_story_formats`, `get_format_info`, `get_format_syntax_guide` |
 | **Refactor** | `split_passage`, `merge_passages` |
-| **Utility** | `ping`, `get_config` |
+| **Utility** | `ping`, `get_config`, `list_workspace_roots`, `rescan_workspace` |
 
 **MCP Resources:** `twine://stories`, `twine://story/{name}`, `twine://story/{name}/graph`, `twine://story/{name}/summary`
 
