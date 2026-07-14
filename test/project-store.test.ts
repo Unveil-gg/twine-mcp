@@ -102,3 +102,38 @@ describe('ProjectStore stylesheet/script passage handling', () => {
     expect(reloaded.getStoryFull('')?.storyStylesheet).toBe('');
   });
 });
+
+describe('ProjectStore external edit detection', () => {
+  it('isStale() is false immediately after load', () => {
+    expect(store.isStale()).toBe(false);
+  });
+
+  it('isStale() returns true after .twee files change on disk', () => {
+    fs.writeFileSync(
+      path.join(projectDir, 'src', 'New.twee'),
+      ':: New Passage\nFresh text.\n',
+      'utf-8',
+    );
+    expect(store.isStale()).toBe(true);
+  });
+
+  it('reload() picks up passages added externally', () => {
+    fs.writeFileSync(
+      path.join(projectDir, 'src', 'New.twee'),
+      ':: New Passage\nFresh text.\n',
+      'utf-8',
+    );
+    store.reload();
+    const passage = store.getStoryFull('')!.passages.find(
+      (p) => p.name === 'New Passage',
+    );
+    expect(passage?.text).toBe('Fresh text.');
+  });
+
+  it('reload() omits passages deleted externally', () => {
+    fs.rmSync(path.join(projectDir, 'src', 'Start.twee'));
+    store.reload();
+    const names = store.getStoryFull('')!.passages.map((p) => p.name);
+    expect(names).not.toContain('Start');
+  });
+});

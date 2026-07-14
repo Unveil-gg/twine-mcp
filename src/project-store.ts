@@ -88,6 +88,8 @@ export class ProjectStore implements IStoryStore {
    */
   private styleFile: string | undefined;
   private scriptFile: string | undefined;
+  /** Absolute .twee path → mtime (ms) from the last loadProject(). */
+  private sourceSnapshot = new Map<string, number>();
 
   constructor(projectRoot: string) {
     this.projectRoot = projectRoot;
@@ -159,6 +161,49 @@ export class ProjectStore implements IStoryStore {
     this.passageFileMap = fileMap;
     this.styleFile = styleFile;
     this.scriptFile = scriptFile;
+    this.captureSourceSnapshot();
+  }
+
+  /** Record mtimes of all source .twee files after a full parse. */
+  private captureSourceSnapshot(): void {
+    const snap = new Map<string, number>();
+    if (!fs.existsSync(this.srcDir)) {
+      this.sourceSnapshot = snap;
+      return;
+    }
+    for (const filePath of this.findTweeFiles()) {
+      try {
+        snap.set(filePath, fs.statSync(filePath).mtimeMs);
+      } catch {
+        // Unreadable file — leave it out; isStale() will notice.
+      }
+    }
+    this.sourceSnapshot = snap;
+  }
+
+  /**
+   * True when src/ .twee files changed on disk since the last load.
+   * Cheap directory listing + mtime check only — no Twee parsing.
+   */
+  isStale(): boolean {
+    if (!fs.existsSync(this.srcDir)) {
+      return this.sourceSnapshot.size > 0;
+    }
+    const current = this.findTweeFiles();
+    if (current.length !== this.sourceSnapshot.size) return true;
+    for (const filePath of current) {
+      const prev = this.sourceSnapshot.get(filePath);
+      if (prev === undefined) return true;
+      try {
+        if (fs.statSync(filePath).mtimeMs !== prev) return true;
+      } catch {
+        return true;
+      }
+    }
+    for (const filePath of this.sourceSnapshot.keys()) {
+      if (!fs.existsSync(filePath)) return true;
+    }
+    return false;
   }
 
   /** Glob for *.twee and *.tw files under src/. */

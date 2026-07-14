@@ -204,6 +204,11 @@ export class WorkspaceStore implements IStoryStore {
    * @param name - Story name from listStories()
    * @param rootHint - Optional project root to disambiguate collisions
    */
+  /** Reload a cached store when its .twee sources changed on disk. */
+  private ensureFresh(ps: ProjectStore): void {
+    if (ps.isStale()) ps.reload();
+  }
+
   getProjectStore(name: string, rootHint?: string): ProjectStore | null {
     const root = this.resolveRoot(name, rootHint);
     if (!root) return null;
@@ -212,7 +217,9 @@ export class WorkspaceStore implements IStoryStore {
       ps.initSync();
       this.projects.set(root, ps);
     }
-    return this.projects.get(root)!;
+    const ps = this.projects.get(root)!;
+    this.ensureFresh(ps);
+    return ps;
   }
 
   // ── IStoryStore ─────────────────────────────────────────────────────────────
@@ -228,7 +235,12 @@ export class WorkspaceStore implements IStoryStore {
     for (const [name, roots] of this.index) {
       for (const root of roots) {
         const ps = this.projects.get(root);
-        out.push(ps?.listStories()[0] ?? lightMeta(name, root));
+        if (ps) {
+          this.ensureFresh(ps);
+          out.push(ps.listStories()[0]);
+        } else {
+          out.push(lightMeta(name, root));
+        }
       }
     }
     return out;

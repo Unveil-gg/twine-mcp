@@ -207,4 +207,27 @@ describe('WorkspaceStore', () => {
     store.setClientRootsError(null);
     expect(store.clientRootsError).toBeNull();
   });
+
+  it('refreshes cached ProjectStore after external .twee edits', async () => {
+    const projectDir = path.join(tmpBase, 'refresh-game');
+    makeProject(projectDir, 'Refresh Game');
+    const store = new WorkspaceStore([tmpBase]);
+    await store.init();
+
+    const before = store.getStoryFull('Refresh Game');
+    expect(before!.passages.map((p) => p.name)).toEqual(['Start']);
+
+    fs.writeFileSync(
+      path.join(projectDir, 'src', 'Added.twee'),
+      ':: Added\nNew content here.\n',
+      'utf-8',
+    );
+    fs.unlinkSync(path.join(projectDir, 'src', 'Start.twee'));
+
+    const after = store.getStoryFull('Refresh Game');
+    const names = after!.passages.map((p) => p.name);
+    expect(names).toContain('Added');
+    expect(names).not.toContain('Start');
+    expect(after!.passageCount).toBe(names.length);
+  });
 });
