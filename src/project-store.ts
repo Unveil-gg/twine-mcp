@@ -80,6 +80,14 @@ export class ProjectStore implements IStoryStore {
   private story: Story = new Story();
   /** Maps passage name → absolute .twee file path. */
   private passageFileMap = new Map<string, string>();
+  /**
+   * Source file for story.storyStylesheet / story.storyJavaScript.
+   * extwee absorbs [stylesheet]/[script]-tagged passages into these
+   * Story-level fields (they never appear in story.passages), so we
+   * track their origin file separately to round-trip edits back to disk.
+   */
+  private styleFile: string | undefined;
+  private scriptFile: string | undefined;
 
   constructor(projectRoot: string) {
     this.projectRoot = projectRoot;
@@ -104,6 +112,8 @@ export class ProjectStore implements IStoryStore {
     const master = new Story(path.basename(this.projectRoot));
     const fileMap = new Map<string, string>();
     const addedNames = new Set<string>();
+    let styleFile: string | undefined;
+    let scriptFile: string | undefined;
 
     // Parse each .twee file and merge passages
     for (const filePath of tweeFiles) {
@@ -124,6 +134,19 @@ export class ProjectStore implements IStoryStore {
         if (fileStory.name) master.name = fileStory.name;
       }
 
+      // extwee absorbs [stylesheet]/[script]-tagged passages into
+      // fileStory.storyStylesheet/storyJavaScript during parseTwee()
+      // (they are never present in fileStory.passages). Carry that
+      // content over to the merged story, or it is silently lost.
+      if (fileStory.storyStylesheet) {
+        master.storyStylesheet += fileStory.storyStylesheet;
+        styleFile ??= filePath;
+      }
+      if (fileStory.storyJavaScript) {
+        master.storyJavaScript += fileStory.storyJavaScript;
+        scriptFile ??= filePath;
+      }
+
       for (const p of fileStory.passages as Passage[]) {
         if (addedNames.has(p.name)) continue;
         addedNames.add(p.name);
@@ -134,6 +157,8 @@ export class ProjectStore implements IStoryStore {
 
     this.story = master;
     this.passageFileMap = fileMap;
+    this.styleFile = styleFile;
+    this.scriptFile = scriptFile;
   }
 
   /** Glob for *.twee and *.tw files under src/. */
@@ -181,20 +206,52 @@ export class ProjectStore implements IStoryStore {
   saveStory(story: Story): void {
     const defaultFile = path.join(this.srcDir, 'passages.twee');
     const byFile = new Map<string, Passage[]>();
+    const prevStyleFile = this.styleFile;
+    const prevScriptFile = this.scriptFile;
+
+    const addToFile = (file: string, p: Passage): void => {
+      if (!byFile.has(file)) byFile.set(file, []);
+      byFile.get(file)!.push(p);
+    };
 
     for (const p of story.passages as Passage[]) {
       const file = this.passageFileMap.get(p.name) ?? defaultFile;
-      if (!byFile.has(file)) byFile.set(file, []);
-      byFile.get(file)!.push(p);
+      addToFile(file, p);
       if (!this.passageFileMap.has(p.name)) {
         this.passageFileMap.set(p.name, file);
       }
     }
 
-    // Handle deleted passages: rebuild all previously-tracked files
+    // story.storyStylesheet/storyJavaScript never live in story.passages
+    // (extwee absorbs [stylesheet]/[script]-tagged passages on parse),
+    // so round-trip them as tagged passages in their origin file here.
+    if (story.storyStylesheet) {
+      const file =
+        this.styleFile ?? path.join(this.srcDir, 'Story Stylesheet.twee');
+      this.styleFile = file;
+      addToFile(
+        file,
+        new Passage('Story Stylesheet', story.storyStylesheet,
+          ['stylesheet'], {}),
+      );
+    }
+    if (story.storyJavaScript) {
+      const file =
+        this.scriptFile ?? path.join(this.srcDir, 'Story JavaScript.twee');
+      this.scriptFile = file;
+      addToFile(
+        file,
+        new Passage('Story JavaScript', story.storyJavaScript,
+          ['script'], {}),
+      );
+    }
+
+    // Handle deleted passages/content: rebuild all previously-tracked files
     const allFiles = new Set([
       ...byFile.keys(),
       ...[...this.passageFileMap.values()],
+      ...(prevStyleFile ? [prevStyleFile] : []),
+      ...(prevScriptFile ? [prevScriptFile] : []),
     ]);
     for (const filePath of allFiles) {
       const passages = byFile.get(filePath) ?? [];

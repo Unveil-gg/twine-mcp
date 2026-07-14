@@ -9,6 +9,11 @@
  *
  * These tools handle format detection automatically so callers
  * do not need to know the convention in advance.
+ *
+ * Tag-based conventions are handled specially: extwee absorbs any
+ * [stylesheet]-tagged passage's text into Story.storyStylesheet at
+ * parse time, so it never appears in the passages array. These tools
+ * read/write that field directly instead of searching passages for it.
  */
 
 import * as z from 'zod/v4';
@@ -66,14 +71,23 @@ export function registerCssTools(
       if (!full) return err(storyNotFoundMsg(story, store));
 
       const info = getStylesheetPassage(full.format);
-      const passage = findStylesheetPassage(full.passages, full.format);
 
+      if (info.tag) {
+        const css = full.storyStylesheet || null;
+        return ok({
+          story,
+          format: full.format,
+          convention: `tag: "${info.tag}"`,
+          passageName: css ? info.name : null,
+          css,
+        });
+      }
+
+      const passage = findStylesheetPassage(full.passages, full.format);
       return ok({
         story,
         format: full.format,
-        convention: info.tag
-          ? `tag: "${info.tag}"`
-          : `name: "${info.name}"`,
+        convention: `name: "${info.name}"`,
         passageName: passage?.name ?? null,
         css: passage?.text ?? null,
       });
@@ -110,6 +124,22 @@ export function registerCssTools(
       const storyObj = store.getStoryObject(story);
       if (!storyObj) return err(storyNotFoundMsg(story, store));
 
+      if (info.tag) {
+        const existingCss = storyObj.storyStylesheet;
+        storyObj.storyStylesheet =
+          mode === 'append' && existingCss
+            ? `${existingCss}\n\n${css}`
+            : css;
+        store.saveStory(storyObj);
+        return ok({
+          action: existingCss ? 'updated' : 'created',
+          passageName: info.name,
+          tags: [info.tag],
+          mode,
+          story,
+        });
+      }
+
       const existing = findStylesheetPassage(full.passages, full.format);
 
       if (existing) {
@@ -129,15 +159,15 @@ export function registerCssTools(
         });
       }
 
-      // No stylesheet passage exists — create one.
-      const tags = info.tag ? [info.tag] : [];
-      const newPassage = new Passage(info.name, css, tags, {});
+      // No stylesheet passage exists — create one (name-based
+      // convention only; the tag-based case returned above).
+      const newPassage = new Passage(info.name, css, [], {});
       storyObj.addPassage(newPassage);
       store.saveStory(storyObj);
       return ok({
         action: 'created',
         passageName: info.name,
-        tags,
+        tags: [],
         mode: 'replace',
         story,
       });
