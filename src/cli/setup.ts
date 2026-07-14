@@ -343,4 +343,11 @@ export async function runSetup(): Promise<void> {
     `Your editor will auto-start ${cyan('twine-mcp')} on next launch.\n` +
     `  ${dim('Or start manually:')} ${cyan('npx @unveil-gg/twine-mcp')}\n`,
   );
+  console.log(
+    dim(
+      '  Need more than one games folder? Add TWINE_WORKSPACE_ROOTS ' +
+      '(comma-separated) to your MCP config, or list them in ' +
+      '~/.twine-mcp/config.json.\n',
+    ),
+  );
 }
