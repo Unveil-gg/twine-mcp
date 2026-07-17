@@ -15,12 +15,22 @@ import {
   Story,
   Passage,
   parseTwine2HTML,
-  compileTwine2HTML,
   generateIFID,
 } from 'extwee';
 import { hasExistingTweeProject, type WorkspaceStore } from
   '../workspace-store.js';
-import { resolveFormat, DEFAULT_FORMAT_VERSIONS } from '../format-manager.js';
+import {
+  resolveFormat,
+  resolveFormatFile,
+  DEFAULT_FORMAT_VERSIONS,
+} from '../format-manager.js';
+import {
+  resolveTweego,
+  tweegoFormatId,
+  ensureFormatOverride,
+  runTweego,
+} from '../tweego-manager.js';
+import { scanProjectAssets } from '../util/asset-scan.js';
 import { ok, err } from './stories.js';
 import { storyNotFoundMsg, passageNotFoundMsg } from '../util/errors.js';
 import type { ValidationIssue } from '../types.js';
@@ -48,8 +58,12 @@ export function registerProjectTools(
     {
       description:
         'Scaffold a new Twee project directory with src/, StoryData.twee, ' +
-        'Start.twee, and .gitignore. Downloads and caches the story format. ' +
-        'Run this once per game before any other tools.',
+        'Start.twee, dist/, assets/, and .gitignore. Downloads and caches ' +
+        'the story format. Run this once per game before any other tools. ' +
+        'Put image/audio/video/font files under src/ to have build_story ' +
+        'bundle them automatically (SugarCube only); use assets/ instead ' +
+        'for files you want to reference by relative URL, left untouched ' +
+        'by the compiler.',
       inputSchema: {
         project_dir: z
           .string()
@@ -203,8 +217,12 @@ export function registerProjectTools(
     'build_story',
     {
       description:
-        'Compile the project into a playable HTML file using the story ' +
-        'format engine. Writes to dist/<story-name>.html. ' +
+        'Compile the project into a playable HTML file using the Tweego ' +
+        'compiler. Writes to dist/<story-name>.html. Also bundles any ' +
+        'image/audio/video/font files found under src/ as embedded ' +
+        'passages, the same way Tweego does natively (SugarCube only; ' +
+        'other formats don\'t consume them, so they\'re skipped — see ' +
+        'skippedAssets in the response). ' +
         'Always run validate_story first.',
       inputSchema: {
         story: z.string().describe('Story name'),
@@ -225,9 +243,16 @@ export function registerProjectTools(
       const format = storyObj.format || 'Harlowe';
       const version = storyObj.formatVersion || undefined;
 
-      let storyFormat;
+      let tweego;
       try {
-        storyFormat = await resolveFormat(format, version);
+        tweego = await resolveTweego();
+      } catch (e) {
+        return err(String(e instanceof Error ? e.message : e));
+      }
+
+      let formatFile;
+      try {
+        formatFile = await resolveFormatFile(format, version);
       } catch (e) {
         return err(
           `Could not load story format "${format}" ${version ?? ''}: ` +
@@ -235,11 +260,18 @@ export function registerProjectTools(
         );
       }
 
-      let html: string;
-      try {
-        html = compileTwine2HTML(storyObj, storyFormat);
-      } catch (e) {
-        return err(`Compilation failed: ${String(e)}`);
+      const formatId = tweegoFormatId(format, formatFile.version);
+      const formatsDir = ensureFormatOverride(formatId, formatFile.path);
+
+      const authoredNames = new Set(
+        (storyObj.passages as Passage[]).map((p) => p.name),
+      );
+      const formatSupportsMedia = format.toLowerCase() === 'sugarcube';
+      const { sources, bundled, skipped } = scanProjectAssets(
+        ps.srcDir, authoredNames, formatSupportsMedia,
+      );
+      if (sources.length === 0) {
+        return err(`No compilable source files found under "${ps.srcDir}".`);
       }
 
       const outDir = path.join(ps.projectRoot, 'dist');
@@ -247,14 +279,25 @@ export function registerProjectTools(
       const safeName = storyObj.name.replace(/[^\w\s-]/g, '').trim();
       const dest =
         output_path ?? path.join(outDir, `${safeName || 'story'}.html`);
-      fs.writeFileSync(dest, html, 'utf-8');
+
+      const result = await runTweego(
+        tweego.binPath, ['-f', formatId, '-o', dest, ...sources], formatsDir,
+      );
+      if (result.code !== 0) {
+        return err(
+          `Tweego compilation failed (exit ${result.code}): ` +
+          (result.stderr.trim() || result.stdout.trim() || 'no output'),
+        );
+      }
 
       return ok({
         outputPath: dest,
         format,
-        formatVersion: version ?? 'default',
+        formatVersion: formatFile.version,
         passageCount: (storyObj.passages as Passage[]).length,
-        byteSize: Buffer.byteLength(html, 'utf-8'),
+        byteSize: fs.statSync(dest).size,
+        bundledAssets: bundled,
+        skippedAssets: skipped,
       });
     },
   );

@@ -150,6 +150,32 @@ export async function resolveFormat(
 }
 
 /**
+ * Resolve a format's cached format.js file path, downloading and
+ * caching it first if necessary. Used by tweego-manager to build a
+ * fresh-version story-format override for the Tweego compiler, which
+ * otherwise only has the (older) formats bundled with its own
+ * release zip.
+ *
+ * @param format  - Format name (case-insensitive)
+ * @param version - Version string; if omitted, uses DEFAULT_FORMAT_VERSIONS
+ * @returns Absolute path to the cached format.js file, and the
+ *   version string that was actually resolved
+ */
+export async function resolveFormatFile(
+  format: string,
+  version?: string,
+): Promise<{ path: string; version: string }> {
+  const normalizedFormat = format.toLowerCase().replace(/\s+\d.*$/, '').trim();
+  const resolvedVersion =
+    version ?? DEFAULT_FORMAT_VERSIONS[normalizedFormat] ?? '1.0.0';
+  await resolveFormat(format, version);
+  return {
+    path: cachedPath(normalizedFormat, resolvedVersion),
+    version: resolvedVersion,
+  };
+}
+
+/**
  * Check if a format/version is already cached locally.
  *
  * @param format  - Format name (case-insensitive)

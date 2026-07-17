@@ -66,6 +66,17 @@ Add to your editor's MCP config (`~/.cursor/mcp.json`, `~/.claude.json`, etc.):
 
 **MCP Resources:** `twine://stories`, `twine://story/{name}`, `twine://story/{name}/graph`, `twine://story/{name}/summary`
 
+### Building & bundling assets
+
+`build_story` compiles with the [Tweego](https://www.motoslave.net/tweego/) compiler (downloaded and cached on first use). Drop image/audio/video/font files under `src/` and they're bundled automatically as embedded passages — no manual base64 step needed:
+
+- `src/` — passed to Tweego; anything dropped here (`.twee`, `.css`, `.js`, fonts, images, audio, video) gets compiled or bundled into the output HTML.
+- `assets/` — left alone by the compiler; use this for files you want to reference by relative URL instead of embedding.
+
+Asset bundling into `Twine.image`/`Twine.audio`/`Twine.video` passages is a SugarCube-specific feature — other formats skip them (see `skippedAssets` in the `build_story` response). A file whose name collides with an existing passage is also skipped rather than overwritten.
+
+No prebuilt Tweego binary exists yet for Apple Silicon Macs (an [upstream gap](https://github.com/tmedwards/tweego/issues/30)). Until twine-mcp ships its own build, run under Rosetta 2 or build Tweego yourself and point `TWINE_MCP_TWEEGO_BIN` at the binary.
+
 ### Recommended AI workflow
 
 ```
