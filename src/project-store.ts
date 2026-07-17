@@ -73,6 +73,36 @@ function writeTweeContent(passages: Passage[]): string {
   return passages.map((p) => p.toTwee()).join('\n\n') + '\n';
 }
 
+/**
+ * Serialize StoryTitle + StoryData headers from in-memory Story fields.
+ * extwee absorbs these passages on parse, so saveStory must rewrite them
+ * explicitly when story metadata (start, format, etc.) changes.
+ *
+ * @param story - Story with metadata fields to persist
+ * @returns Twee 3 content for StoryTitle and StoryData passages
+ */
+function buildMetadataTwee(story: Story): string {
+  const metadata: Record<string, unknown> = {};
+  if (story.IFID) metadata.ifid = story.IFID;
+  if (story.format) metadata.format = story.format;
+  if (story.formatVersion) {
+    metadata['format-version'] = story.formatVersion;
+  }
+  if (story.zoom) metadata.zoom = story.zoom;
+  if (story.start) metadata.start = story.start;
+  const tagColors = story.tagColors as Record<string, string> | undefined;
+  if (tagColors && Object.keys(tagColors).length > 0) {
+    metadata['tag-colors'] = tagColors;
+  }
+
+  let out = '';
+  if (story.name) {
+    out += `:: StoryTitle\n${story.name}\n\n`;
+  }
+  out += `:: StoryData\n${JSON.stringify(metadata, null, 2)}\n`;
+  return out;
+}
+
 export class ProjectStore implements IStoryStore {
   readonly projectRoot: string;
   readonly srcDir: string;
@@ -88,6 +118,8 @@ export class ProjectStore implements IStoryStore {
    */
   private styleFile: string | undefined;
   private scriptFile: string | undefined;
+  /** Source file containing :: StoryData / :: StoryTitle metadata. */
+  private metadataFile: string | undefined;
   /** Absolute .twee path → mtime (ms) from the last loadProject(). */
   private sourceSnapshot = new Map<string, number>();
 
@@ -116,6 +148,7 @@ export class ProjectStore implements IStoryStore {
     const addedNames = new Set<string>();
     let styleFile: string | undefined;
     let scriptFile: string | undefined;
+    let metadataFile: string | undefined;
 
     // Parse each .twee file and merge passages
     for (const filePath of tweeFiles) {
@@ -134,6 +167,7 @@ export class ProjectStore implements IStoryStore {
         master.formatVersion = fileStory.formatVersion;
         master.start = fileStory.start;
         if (fileStory.name) master.name = fileStory.name;
+        metadataFile = filePath;
       }
 
       // extwee absorbs [stylesheet]/[script]-tagged passages into
@@ -161,6 +195,7 @@ export class ProjectStore implements IStoryStore {
     this.passageFileMap = fileMap;
     this.styleFile = styleFile;
     this.scriptFile = scriptFile;
+    this.metadataFile = metadataFile;
     this.captureSourceSnapshot();
   }
 
@@ -291,14 +326,25 @@ export class ProjectStore implements IStoryStore {
       );
     }
 
+    const metadataFile =
+      this.metadataFile ?? path.join(this.srcDir, 'StoryData.twee');
+    const shouldWriteMetadata =
+      Boolean(this.metadataFile) ||
+      Boolean(story.IFID) ||
+      Boolean(story.start);
+
     // Handle deleted passages/content: rebuild all previously-tracked files
     const allFiles = new Set([
       ...byFile.keys(),
       ...[...this.passageFileMap.values()],
       ...(prevStyleFile ? [prevStyleFile] : []),
       ...(prevScriptFile ? [prevScriptFile] : []),
+      ...(shouldWriteMetadata ? [metadataFile] : []),
     ]);
     for (const filePath of allFiles) {
+      if (shouldWriteMetadata && filePath === metadataFile) {
+        continue;
+      }
       const passages = byFile.get(filePath) ?? [];
       if (passages.length === 0) {
         // All passages were removed from this file — clear it
@@ -311,7 +357,19 @@ export class ProjectStore implements IStoryStore {
       fs.writeFileSync(filePath, writeTweeContent(passages), 'utf-8');
     }
 
+    if (shouldWriteMetadata) {
+      const passages = byFile.get(metadataFile) ?? [];
+      let content = buildMetadataTwee(story);
+      if (passages.length > 0) {
+        content += '\n' + writeTweeContent(passages);
+      }
+      fs.mkdirSync(path.dirname(metadataFile), { recursive: true });
+      fs.writeFileSync(metadataFile, content, 'utf-8');
+      this.metadataFile = metadataFile;
+    }
+
     this.story = story;
+    this.captureSourceSnapshot();
   }
 
   createStory(

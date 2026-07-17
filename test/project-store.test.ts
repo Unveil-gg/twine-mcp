@@ -103,6 +103,46 @@ describe('ProjectStore stylesheet/script passage handling', () => {
   });
 });
 
+describe('ProjectStore story metadata persistence', () => {
+  it('persists start passage changes to StoryData.twee on disk', () => {
+    fs.writeFileSync(
+      path.join(projectDir, 'src', 'Splash.twee'),
+      ':: Splash\nWelcome.\n',
+      'utf-8',
+    );
+    store.reload();
+    const storyObj = store.getStoryObject('')!;
+    storyObj.start = 'Splash';
+    store.saveStory(storyObj);
+
+    const storyData = fs.readFileSync(
+      path.join(projectDir, 'src', 'StoryData.twee'),
+      'utf-8',
+    );
+    expect(storyData).toContain('"start": "Splash"');
+
+    const reloaded = new ProjectStore(projectDir);
+    reloaded.initSync();
+    expect(reloaded.getStoryFull('')?.startPassage).toBe('Splash');
+  });
+
+  it('keeps startPassage after reload triggered by save mtimes', () => {
+    fs.writeFileSync(
+      path.join(projectDir, 'src', 'Splash.twee'),
+      ':: Splash\nWelcome.\n',
+      'utf-8',
+    );
+    store.reload();
+    const storyObj = store.getStoryObject('')!;
+    storyObj.start = 'Splash';
+    store.saveStory(storyObj);
+
+    expect(store.isStale()).toBe(false);
+    store.reload();
+    expect(store.getStoryFull('')?.startPassage).toBe('Splash');
+  });
+});
+
 describe('ProjectStore external edit detection', () => {
   it('isStale() is false immediately after load', () => {
     expect(store.isStale()).toBe(false);
