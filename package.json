@@ -1,6 +1,6 @@
 {
   "name": "@unveil-gg/twine-mcp",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "MCP server for Twine interactive story authoring",
   "type": "module",
   "main": "dist/server.js",
@@ -39,7 +39,6 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
     "adm-zip": "^0.6.0",
-    "chokidar": "^4.0.3",
     "extwee": "^2.2.3",
     "uuid": "^11.1.0"
   },
