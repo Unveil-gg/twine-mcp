@@ -12,6 +12,7 @@ import { Passage } from 'extwee';
 import type { IStoryStore } from '../types.js';
 import { ok, err } from './stories.js';
 import { storyNotFoundMsg, passageNotFoundMsg } from '../util/errors.js';
+import { destructive, mutating } from '../util/tool-annotations.js';
 
 /**
  * Registers split_passage and merge_passages tools on the MCP server.
@@ -27,6 +28,7 @@ export function registerRefactorTools(
   server.registerTool(
     'split_passage',
     {
+      annotations: mutating,
       description:
         'Split a passage into two passages at the specified line number. ' +
         'Inserts a [[new_passage_name]] link at the split point. ' +
@@ -124,6 +126,7 @@ export function registerRefactorTools(
   server.registerTool(
     'merge_passages',
     {
+      annotations: destructive,
       description:
         'Merge two passages into one. The content of the second passage is ' +
         'appended to the first. The direct link between them is removed. ' +

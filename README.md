@@ -54,7 +54,7 @@ Add to your editor's MCP config (`~/.cursor/mcp.json`, `~/.claude.json`, etc.):
 | Category | Tools |
 |----------|-------|
 | **Stories** | `list_stories`, `get_story`, `create_story`, `delete_story`, `export_twee` |
-| **Passages** | `list_passages`, `get_passage`, `create_passage`, `update_passage`, `delete_passage`, `rename_passage`, `set_start_passage`, `batch_update` |
+| **Passages** | `list_passages`, `get_passage`, `patch_passage`, `create_passage`, `update_passage`, `delete_passage`, `rename_passage`, `set_start_passage`, `batch_update` |
 | **CSS** | `get_stylesheet`, `update_stylesheet` |
 | **Graph** | `get_link_graph`, `find_broken_links`, `find_dead_ends`, `find_orphans`, `find_cycles`, `get_passage_path`, `get_reachable_passages` |
 | **Analysis** | `analyze_story`, `get_story_stats`, `search_passages`, `find_variable_usage`, `check_tag_consistency` |
@@ -64,7 +64,18 @@ Add to your editor's MCP config (`~/.cursor/mcp.json`, `~/.claude.json`, etc.):
 | **Refactor** | `split_passage`, `merge_passages` |
 | **Utility** | `ping`, `get_config`, `list_workspace_roots`, `rescan_workspace` |
 
-**MCP Resources:** `twine://stories`, `twine://story/{name}`, `twine://story/{name}/graph`, `twine://story/{name}/summary`
+**MCP Resources** (compact JSON, no passage text, no editor coordinates):
+
+- `twine://stories` — story index
+- `twine://stories/{name}/manifest` — metadata and passage index (`name`, `tags`, `wordCount`, `links`)
+- `twine://stories/{name}/graph` — link adjacency list
+- `twine://stories/{name}/summary` — counts and issue totals
+
+`twine://story/{name}`, `.../graph`, and `.../summary` are aliases of those payloads. The server accepts `resources/subscribe` and emits `notifications/resources/updated` when a watched story's source files change.
+
+**Prompts:** `audit_branching_dead_ends`, `check_narrative_continuity`.
+
+`get_story` returns metadata. `include_passages` adds a title index, not passage text. `export_twee` writes `export/<story>.twee` and returns the path. Local edits should use `patch_passage`. `get_link_graph` defaults to link counts; `get_narrative_flow` and `get_all_endings` default to previews.
 
 ### Building & bundling assets
 
@@ -81,10 +92,10 @@ No prebuilt Tweego binary exists yet for Apple Silicon Macs (an [upstream gap](h
 
 ```
 ping → summarize_story → get_story_context → get_story_branches
-     → get_narrative_flow → get_passage_context → get_all_endings
+     → get_passage → patch_passage
 ```
 
-Start cheap (`summarize_story` ≈ 200 tokens), go deeper only when needed.
+Or run the `audit_branching_dead_ends` prompt. Start cheap (`summarize_story` or the manifest resource), then read one passage at a time.
 
 ---
 

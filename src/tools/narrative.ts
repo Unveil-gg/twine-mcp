@@ -18,6 +18,9 @@ import {
 } from '../util/graph-algos.js';
 import { ok, err } from './stories.js';
 import { storyNotFoundMsg } from '../util/errors.js';
+import { passageWithoutLayout } from '../util/passage-view.js';
+import { intParam } from '../util/schema.js';
+import { readOnly } from '../util/tool-annotations.js';
 import type { BrokenLink } from '../types.js';
 
 /**
@@ -35,6 +38,7 @@ export function registerNarrativeTools(
   server.registerTool(
     'summarize_story',
     {
+      annotations: readOnly,
       description:
         'Return a minimal narrative snapshot of a story: title, format, ' +
         'passage count, start passage text, branch count, ending count, ' +
@@ -93,6 +97,7 @@ export function registerNarrativeTools(
   server.registerTool(
     'get_story_context',
     {
+      annotations: readOnly,
       description:
         'Return a configurable bundle of story data for AI orientation. ' +
         'Use fields to select what to include; use compact=true to omit ' +
@@ -114,13 +119,12 @@ export function registerNarrativeTools(
             'Compact mode: passage list returns name+preview only, ' +
             'graph returns counts not adjacency list',
           ),
-        max_passages: z
-          .number()
-          .optional()
-          .default(50)
-          .describe(
-            'Max passages to include in passages section (compact=false only)',
-          ),
+        max_passages: intParam(
+          1,
+          200,
+          50,
+          'Max passages to include in the passages section',
+        ),
       },
     },
     async ({ story, fields, compact, max_passages }) => {
@@ -171,7 +175,7 @@ export function registerNarrativeTools(
               wordCount: p.wordCount,
               preview: p.preview,
             }))
-          : sliced;
+          : sliced.map((p) => passageWithoutLayout(p));
         if (full.passages.length > max_passages) {
           result['passagesTruncated'] = true;
           result['passagesTotalCount'] = full.passages.length;
@@ -211,6 +215,7 @@ export function registerNarrativeTools(
   server.registerTool(
     'get_story_delta',
     {
+      annotations: readOnly,
       description:
         'Check what changed in a story since a given timestamp. Use the ' +
         'lastModified value from get_agent_notes or a prior session. ' +

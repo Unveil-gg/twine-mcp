@@ -9,6 +9,12 @@ import { Passage } from 'extwee';
 import type { IStoryStore } from '../types.js';
 import { ok, err } from './stories.js';
 import { storyNotFoundMsg, passageNotFoundMsg } from '../util/errors.js';
+import { toPassageView } from '../util/passage-view.js';
+import {
+  destructive,
+  mutating,
+  readOnly,
+} from '../util/tool-annotations.js';
 
 /**
  * Registers all passage CRUD tools on the MCP server.
@@ -24,10 +30,11 @@ export function registerPassageTools(
   server.registerTool(
     'list_passages',
     {
+      annotations: readOnly,
       description:
-        'List all passages in a story with metadata. ' +
-        'Use fields to limit response size. Passage text is not ' +
-        'included by default — use get_passage for full content.',
+        'Title and link index for a story. Default fields are name, ' +
+        'tags, and wordCount. Request fields ["name","links"] for ' +
+        'outgoing links. Passage text is get_passage only.',
       inputSchema: {
         story: z.string().describe('Story name'),
         fields: z
@@ -85,22 +92,29 @@ export function registerPassageTools(
   server.registerTool(
     'get_passage',
     {
+      annotations: readOnly,
       description:
-        'Get the full content, tags, and outgoing links of a single passage. ' +
-        'CALL BEFORE: update_passage, delete_passage, split_passage.',
+        'Get one passage: text, tags, and outgoing links. ' +
+        'Layout coordinates are omitted unless include_layout is true. ' +
+        'CALL BEFORE: patch_passage, update_passage, delete_passage.',
       inputSchema: {
         story: z.string().describe('Story name'),
         passage: z.string().describe('Passage name'),
+        include_layout: z
+          .boolean()
+          .optional()
+          .default(false)
+          .describe('Include editor position and size'),
       },
     },
-    async ({ story, passage }) => {
+    async ({ story, passage, include_layout }) => {
       const full = store.getStoryFull(story);
       if (!full) return err(storyNotFoundMsg(story, store));
       const p = full.passages.find((x) => x.name === passage);
       if (!p) {
         return err(passageNotFoundMsg(passage, story, full.passages));
       }
-      return ok(p);
+      return ok(toPassageView(p, include_layout));
     },
   );
 
@@ -108,6 +122,7 @@ export function registerPassageTools(
   server.registerTool(
     'create_passage',
     {
+      annotations: mutating,
       description: 'Add a new passage to a story.',
       inputSchema: {
         story: z.string().describe('Story name'),
@@ -147,10 +162,11 @@ export function registerPassageTools(
   server.registerTool(
     'update_passage',
     {
+      annotations: mutating,
       description:
-        'Edit a passage: update text, tags, and/or editor position. ' +
-        'Omit fields you do not want to change. ' +
-        'CALL FIRST: get_passage to read current state before editing.',
+        'Replace a whole passage body, tags, or editor position. ' +
+        'Prefer patch_passage for a local text edit. ' +
+        'Omit fields you do not want to change.',
       inputSchema: {
         story: z.string().describe('Story name'),
         passage: z.string().describe('Passage name'),
@@ -190,6 +206,7 @@ export function registerPassageTools(
   server.registerTool(
     'delete_passage',
     {
+      annotations: destructive,
       description: 'Remove a passage from a story.',
       inputSchema: {
         story: z.string().describe('Story name'),
@@ -214,6 +231,7 @@ export function registerPassageTools(
   server.registerTool(
     'rename_passage',
     {
+      annotations: mutating,
       description:
         'Rename a passage and rewrite all [[links]] that point to it ' +
         'across the entire story. Also updates startPassage if needed.',
@@ -310,6 +328,7 @@ export function registerPassageTools(
   server.registerTool(
     'set_start_passage',
     {
+      annotations: mutating,
       description: 'Set which passage is the story starting point.',
       inputSchema: {
         story: z.string().describe('Story name'),

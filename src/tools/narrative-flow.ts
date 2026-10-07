@@ -17,6 +17,8 @@ import {
 } from '../util/graph-algos.js';
 import { ok, err } from './stories.js';
 import { storyNotFoundMsg, passageNotFoundMsg } from '../util/errors.js';
+import { intParam } from '../util/schema.js';
+import { readOnly } from '../util/tool-annotations.js';
 
 /**
  * Registers flow/traversal narrative tools on the MCP server.
@@ -32,30 +34,27 @@ export function registerNarrativeFlowTools(
   server.registerTool(
     'get_narrative_flow',
     {
+      annotations: readOnly,
       description:
-        'Walk the story graph from the start passage using DFS and return ' +
-        'passages in traversal order with their full content. ' +
-        'Best for reading the story as a sequence. ' +
-        'Use max_depth and max_passages to bound token cost.',
+        'Walk the story graph from the start passage. Returns preview ' +
+        'and links by default. Set include_text for full passage bodies. ' +
+        'Use max_depth and max_passages to bound the result.',
       inputSchema: {
         story: z.string().describe('Story name'),
         from: z
           .string()
           .optional()
           .describe('Start passage (defaults to story start)'),
-        max_depth: z
-          .number()
+        include_text: z
+          .boolean()
           .optional()
-          .default(20)
-          .describe('Maximum link-follow depth'),
-        max_passages: z
-          .number()
-          .optional()
-          .default(30)
-          .describe('Maximum passages to return'),
+          .default(false)
+          .describe('Include full passage text. Default is preview.'),
+        max_depth: intParam(1, 100, 20, 'Maximum link-follow depth'),
+        max_passages: intParam(1, 100, 30, 'Maximum passages to return'),
       },
     },
-    async ({ story, from, max_depth, max_passages }) => {
+    async ({ story, from, include_text, max_depth, max_passages }) => {
       const full = store.getStoryFull(story);
       if (!full) return err(storyNotFoundMsg(story, store));
       const graph = buildLinkGraph(full);
@@ -69,13 +68,15 @@ export function registerNarrativeFlowTools(
       const order = dfsOrdered(graph, start, max_depth, max_passages);
       const flow = order.map(({ name, depth }) => {
         const p = passageMap.get(name);
-        return {
+        const node: Record<string, unknown> = {
           name,
           depth,
-          text: p?.text ?? '',
           links: p?.links ?? [],
           tags: p?.tags ?? [],
         };
+        if (include_text) node['text'] = p?.text ?? '';
+        else node['preview'] = p?.preview ?? '';
+        return node;
       });
 
       return ok({
@@ -92,20 +93,24 @@ export function registerNarrativeFlowTools(
   server.registerTool(
     'get_all_endings',
     {
+      annotations: readOnly,
       description:
-        'Return all terminal passages (no outgoing links, or tagged "ending") ' +
-        'plus upstream paths to each. Use this to audit how each ending ' +
-        'is reached and whether the narrative is satisfying.',
+        'Return terminal passages (no outgoing links, or tagged "ending") ' +
+        'plus upstream paths. Preview by default; set include_text for ' +
+        'full ending text.',
       inputSchema: {
         story: z.string().describe('Story name'),
-        max_paths: z
-          .number()
+        include_text: z
+          .boolean()
           .optional()
-          .default(3)
-          .describe('Max upstream paths to show per ending'),
+          .default(false)
+          .describe('Include full ending text. Default is preview.'),
+        max_paths: intParam(
+          1, 20, 3, 'Max upstream paths to show per ending',
+        ),
       },
     },
-    async ({ story, max_paths }) => {
+    async ({ story, include_text, max_paths }) => {
       const full = store.getStoryFull(story);
       if (!full) return err(storyNotFoundMsg(story, store));
       const graph = buildLinkGraph(full);
@@ -119,7 +124,9 @@ export function registerNarrativeFlowTools(
         return {
           name: p.name,
           tags: p.tags,
-          text: p.text,
+          ...(include_text
+            ? { text: p.text }
+            : { preview: p.preview }),
           upstreamPaths: paths,
         };
       });
@@ -132,6 +139,7 @@ export function registerNarrativeFlowTools(
   server.registerTool(
     'get_passage_context',
     {
+      annotations: readOnly,
       description:
         'For a given passage, return its full content, all upstream paths ' +
         'that lead to it, and all outgoing options. ' +
@@ -139,11 +147,9 @@ export function registerNarrativeFlowTools(
       inputSchema: {
         story: z.string().describe('Story name'),
         passage: z.string().describe('Passage name'),
-        max_upstream_paths: z
-          .number()
-          .optional()
-          .default(5)
-          .describe('Max upstream paths to return'),
+        max_upstream_paths: intParam(
+          1, 20, 5, 'Max upstream paths to return',
+        ),
       },
     },
     async ({ story, passage, max_upstream_paths }) => {
@@ -175,19 +181,16 @@ export function registerNarrativeFlowTools(
   server.registerTool(
     'get_story_branches',
     {
+      annotations: readOnly,
       description:
         'Return all branch points (passages with 2+ outgoing links) ' +
         'with how many passages each branch can reach. ' +
         'Understand the decision tree without reading everything.',
       inputSchema: {
         story: z.string().describe('Story name'),
-        min_choices: z
-          .number()
-          .optional()
-          .default(2)
-          .describe(
-            'Minimum outgoing links to be considered a branch',
-          ),
+        min_choices: intParam(
+          1, 50, 2, 'Minimum outgoing links to count as a branch',
+        ),
       },
     },
     async ({ story, min_choices }) => {

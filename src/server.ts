@@ -17,17 +17,17 @@
  *   twine-mcp setup        ← interactive first-run wizard
  */
 
-import { McpServer, ResourceTemplate } from
+import { McpServer } from
   '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from
   '@modelcontextprotocol/sdk/server/stdio.js';
 
 import { resolveConfiguredRoots } from './config.js';
 import { WorkspaceStore } from './workspace-store.js';
-import { buildLinkGraph } from './story-store.js';
 import { setupRootsCapability } from './util/roots-capability.js';
 import { registerStoryTools } from './tools/stories.js';
 import { registerPassageTools } from './tools/passages.js';
+import { registerPassagePatchTool } from './tools/passage-patch.js';
 import { registerGraphTools } from './tools/graph.js';
 import { registerAnalysisTools } from './tools/analysis.js';
 import { registerAnalysisVarTools } from './tools/analysis-vars.js';
@@ -39,7 +39,20 @@ import { registerProjectTools } from './tools/project.js';
 import { registerRefactorTools } from './tools/refactor.js';
 import { registerAgentNotesTools } from './tools/agent-notes.js';
 import { registerUtilityTools } from './tools/utility.js';
+import { registerStoryResources } from './resources/stories.js';
+import {
+  notifyStoryUpdated,
+  registerResourceSubscriptions,
+} from './resources/subscriptions.js';
+import { registerNarrativePrompts } from './prompts/narrative.js';
 import { VERSION } from './version.js';
+
+const INSTRUCTIONS =
+  'Read summarize_story or twine://stories/{name}/manifest before ' +
+  'editing. Do not request a full Twee or HTML dump. Read one passage ' +
+  'with get_passage. Use patch_passage for local edits and ' +
+  'update_passage only to replace a whole passage. Layout coordinates ' +
+  'are omitted unless include_layout is true.';
 
 async function main(): Promise<void> {
   // Route `setup` subcommand before starting the MCP server
@@ -71,7 +84,10 @@ async function main(): Promise<void> {
     );
   }
 
-  const server = new McpServer({ name: 'twine-mcp', version: VERSION });
+  const server = new McpServer(
+    { name: 'twine-mcp', version: VERSION },
+    { instructions: INSTRUCTIONS },
+  );
 
   // ── MCP `roots` capability: pick up client-advertised folders ───────────────
   setupRootsCapability(server.server, store);
@@ -79,6 +95,7 @@ async function main(): Promise<void> {
   // ── Story / passage / analysis tools ────────────────────────────────────────
   registerStoryTools(server, store);
   registerPassageTools(server, store);
+  registerPassagePatchTool(server, store);
   registerGraphTools(server, store);
   registerAnalysisTools(server, store);
   registerAnalysisVarTools(server, store);
@@ -91,111 +108,19 @@ async function main(): Promise<void> {
   registerAgentNotesTools(server, store);
   registerUtilityTools(server, store);
 
-  // ── MCP Resources ─────────────────────────────────────────────────────────────
-
-  server.resource(
-    'stories',
-    'twine://stories',
-    { description: 'All discovered game projects in the workspace' },
-    async () => ({
-      contents: [{
-        uri: 'twine://stories',
-        mimeType: 'application/json',
-        text: JSON.stringify(store.listStories(), null, 2),
-      }],
-    }),
-  );
-
-  server.resource(
-    'story',
-    new ResourceTemplate('twine://story/{name}', { list: undefined }),
-    { description: 'Full story data including passages' },
-    async (uri, { name }) => {
-      const n = Array.isArray(name) ? name[0] : name;
-      const story = store.getStoryFull(n ?? '');
-      return {
-        contents: [{
-          uri: uri.href,
-          mimeType: 'application/json',
-          text: story
-            ? JSON.stringify(story, null, 2)
-            : JSON.stringify({ error: `Story "${n}" not found` }),
-        }],
-      };
-    },
-  );
-
-  server.resource(
-    'story-graph',
-    new ResourceTemplate('twine://story/{name}/graph', { list: undefined }),
-    { description: 'Passage link graph as adjacency list' },
-    async (uri, { name }) => {
-      const n = Array.isArray(name) ? name[0] : name;
-      const story = store.getStoryFull(n ?? '');
-      return {
-        contents: [{
-          uri: uri.href,
-          mimeType: 'application/json',
-          text: story
-            ? JSON.stringify(buildLinkGraph(story), null, 2)
-            : JSON.stringify({ error: `Story "${n}" not found` }),
-        }],
-      };
-    },
-  );
-
-  server.resource(
-    'story-summary',
-    new ResourceTemplate('twine://story/{name}/summary', { list: undefined }),
-    { description: 'Compact narrative snapshot for quick AI orientation' },
-    async (uri, { name }) => {
-      const n = Array.isArray(name) ? name[0] : name;
-      const story = store.getStoryFull(n ?? '');
-      if (!story) {
-        return {
-          contents: [{
-            uri: uri.href,
-            mimeType: 'application/json',
-            text: JSON.stringify({ error: `Story "${n}" not found` }),
-          }],
-        };
-      }
-      const graph = buildLinkGraph(story);
-      const names = new Set(story.passages.map((p) => p.name));
-      const { reachableFrom } = await import('./util/graph-algos.js');
-      const reachable = reachableFrom(graph, story.startPassage);
-      const summary = {
-        name: story.name,
-        format: `${story.format} ${story.formatVersion}`,
-        passageCount: story.passageCount,
-        wordCount: story.wordCount,
-        startPassage: story.startPassage,
-        startText:
-          story.passages
-            .find((p) => p.name === story.startPassage)
-            ?.text.slice(0, 200) ?? '',
-        branchPoints: story.passages.filter((p) => p.links.length > 1).length,
-        endingCount: story.passages.filter(
-          (p) => p.tags.includes('ending') || p.links.length === 0,
-        ).length,
-        issues: {
-          brokenLinks: story.passages
-            .flatMap((p) => p.links.filter((l) => !names.has(l)))
-            .length,
-          unreachable: story.passages.filter(
-            (p) => !reachable.has(p.name),
-          ).length,
-        },
-      };
-      return {
-        contents: [{
-          uri: uri.href,
-          mimeType: 'application/json',
-          text: JSON.stringify(summary, null, 2),
-        }],
-      };
-    },
-  );
+  registerStoryResources(server, store);
+  const subscriptions = registerResourceSubscriptions(server);
+  registerNarrativePrompts(server, store);
+  store.enableSourceWatch((projectRoot) => {
+    const name = store.storyNameForRoot(projectRoot);
+    if (!name) return;
+    void notifyStoryUpdated(server.server, subscriptions, name)
+      .catch((error: unknown) => {
+        process.stderr.write(
+          `[twine-mcp] resource notify failed: ${String(error)}\n`,
+        );
+      });
+  });
 
   // ── Start transport ───────────────────────────────────────────────────────────
   const transport = new StdioServerTransport();

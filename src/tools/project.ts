@@ -33,6 +33,7 @@ import {
 import { scanProjectAssets } from '../util/asset-scan.js';
 import { ok, err } from './stories.js';
 import { storyNotFoundMsg, passageNotFoundMsg } from '../util/errors.js';
+import { mutating, readOnly } from '../util/tool-annotations.js';
 import type { ValidationIssue } from '../types.js';
 
 /** Special passage names that carry story metadata. */
@@ -56,6 +57,7 @@ export function registerProjectTools(
   server.registerTool(
     'create_project',
     {
+      annotations: mutating,
       description:
         'Scaffold a new Twee project directory with src/, StoryData.twee, ' +
         'Start.twee, dist/, assets/, and .gitignore. Downloads and caches ' +
@@ -111,7 +113,7 @@ export function registerProjectTools(
         `}\n`;
 
       const startContent = `:: Start\nYour story begins here.\n`;
-      const gitignore = `dist/\n.twine-mcp/\n.tweenode/\nnode_modules/\n`;
+      const gitignore = `dist/\nexport/\n.twine-mcp/\n.tweenode/\nnode_modules/\n`;
 
       fs.writeFileSync(
         path.join(srcDir, 'StoryData.twee'), storyDataContent, 'utf-8',
@@ -160,6 +162,7 @@ export function registerProjectTools(
   server.registerTool(
     'validate_story',
     {
+      annotations: readOnly,
       description:
         'Validate a story: checks for broken links, missing start passage, ' +
         'IFID, and format. ' +
@@ -216,6 +219,7 @@ export function registerProjectTools(
   server.registerTool(
     'build_story',
     {
+      annotations: mutating,
       description:
         'Compile the project into a playable HTML file using the Tweego ' +
         'compiler. Writes to dist/<story-name>.html. Also bundles any ' +
@@ -306,6 +310,7 @@ export function registerProjectTools(
   server.registerTool(
     'import_from_twine',
     {
+      annotations: mutating,
       description:
         'Import a Twine desktop story HTML file into a Twee project directory. ' +
         'Detects format, preserves IFID and passage positions, ' +
@@ -419,6 +424,7 @@ export function registerProjectTools(
   server.registerTool(
     'move_passage',
     {
+      annotations: mutating,
       description:
         'Move a passage from its current .twee file to a different one. ' +
         'Links are not changed — this is a file organization operation only.',
@@ -466,6 +472,7 @@ export function registerProjectTools(
   server.registerTool(
     'list_files',
     {
+      annotations: readOnly,
       description:
         'List all .twee source files in a project with passage and word ' +
         'counts per file. Cheapest way to understand project structure.',
@@ -491,6 +498,7 @@ export function registerProjectTools(
   server.registerTool(
     'export_for_twine',
     {
+      annotations: mutating,
       description:
         'Export the project as a Twine-importable archive HTML file ' +
         'with passage positions preserved. Drag this file into Twine ' +

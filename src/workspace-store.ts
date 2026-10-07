@@ -33,6 +33,7 @@ import {
   lightMeta,
   readStoryName,
 } from './util/project-discovery.js';
+import { watchStorySources, type StoryWatch } from './util/story-watch.js';
 import type {
   IStoryStore,
   StoryMeta,
@@ -59,6 +60,10 @@ export class WorkspaceStore implements IStoryStore {
   private readonly projects = new Map<string, ProjectStore>();
   /** story name → all project roots currently using that name. */
   private readonly index = new Map<string, string[]>();
+  private watching = false;
+  private watchedKey = '';
+  private watchHandle: StoryWatch | null = null;
+  private onSourcesChanged: ((projectRoot: string) => void) | null = null;
 
   constructor(configuredRoots: string[]) {
     this.configuredRoots = dedupeRoots(configuredRoots);
@@ -165,6 +170,53 @@ export class WorkspaceStore implements IStoryStore {
     for (const root of [...this.projects.keys()]) {
       if (!discoveredRoots.has(root)) this.projects.delete(root);
     }
+    this.syncWatches();
+  }
+
+  /**
+   * Watch discovered project sources and report external edits.
+   * Later rescan() calls re-arm watches when the project set changes.
+   *
+   * @param onChange - Called with the project root after a debounced edit
+   */
+  enableSourceWatch(onChange: (projectRoot: string) => void): void {
+    this.onSourcesChanged = onChange;
+    this.watching = true;
+    this.syncWatches();
+  }
+
+  /**
+   * Story name that lives at a project root, if that root is indexed.
+   *
+   * @param projectRoot - Absolute project directory
+   * @returns Story name, or null
+   */
+  storyNameForRoot(projectRoot: string): string | null {
+    const abs = path.resolve(projectRoot);
+    for (const [name, roots] of this.index) {
+      if (roots.some((root) => path.resolve(root) === abs)) return name;
+    }
+    return null;
+  }
+
+  /** Restart filesystem watches when the discovered project set changes. */
+  private syncWatches(): void {
+    if (!this.watching) return;
+    const roots: string[] = [];
+    for (const list of this.index.values()) roots.push(...list);
+    roots.sort();
+    const key = roots.join('\n');
+    if (key === this.watchedKey && this.watchHandle) return;
+    this.watchedKey = key;
+    this.watchHandle?.close();
+    this.watchHandle = null;
+    if (roots.length === 0) return;
+    this.watchHandle = watchStorySources(roots, (projectRoot) => {
+      const resolved = path.resolve(projectRoot);
+      const cached = this.projects.get(resolved);
+      if (cached) cached.reload();
+      this.onSourcesChanged?.(resolved);
+    });
   }
 
   /**
@@ -302,6 +354,10 @@ export class WorkspaceStore implements IStoryStore {
   }
 
   async close(): Promise<void> {
+    this.watchHandle?.close();
+    this.watchHandle = null;
+    this.watching = false;
+    this.watchedKey = '';
     for (const ps of this.projects.values()) {
       await ps.close();
     }

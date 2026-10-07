@@ -7,9 +7,12 @@ import * as z from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { WorkspaceStore } from '../workspace-store.js';
 import { ok, err } from './stories.js';
-import { storyNotFoundMsg } from '../util/errors.js';
+import { storyNotFoundMsg, passageNotFoundMsg } from '../util/errors.js';
+import type { ToolError } from '../util/errors.js';
 import { listCachedFormats } from '../format-manager.js';
 import { VERSION } from '../version.js';
+import { mutating, readOnly } from '../util/tool-annotations.js';
+import { Passage } from 'extwee';
 
 /**
  * Registers server-level utility tools on the MCP server.
@@ -25,6 +28,7 @@ export function registerUtilityTools(
   server.registerTool(
     'ping',
     {
+      annotations: readOnly,
       description:
         'Health check. Returns server version, workspace roots, and ' +
         'the list of discovered game projects.',
@@ -51,6 +55,7 @@ export function registerUtilityTools(
   server.registerTool(
     'get_config',
     {
+      annotations: readOnly,
       description:
         'Return current server configuration, including the full ' +
         'effective set of workspace roots being scanned for projects.',
@@ -76,6 +81,7 @@ export function registerUtilityTools(
   server.registerTool(
     'list_workspace_roots',
     {
+      annotations: readOnly,
       description:
         'List the effective workspace roots being scanned for Twine ' +
         'projects: configured roots (config file / env vars) unioned ' +
@@ -101,6 +107,7 @@ export function registerUtilityTools(
   server.registerTool(
     'rescan_workspace',
     {
+      annotations: readOnly,
       description:
         'Re-scan all effective workspace roots for Twine projects ' +
         'without restarting the server. Normally unnecessary — ' +
@@ -121,8 +128,8 @@ export function registerUtilityTools(
   server.registerTool(
     'batch_update',
     {
+      annotations: mutating,
       description:
-        'Apply multiple passage updates to a story in a single atomic save. ' +
         'Specify text, tags, or position for each passage.',
       inputSchema: {
         story: z.string().describe('Story name'),
@@ -142,13 +149,18 @@ export function registerUtilityTools(
     async ({ story, updates }) => {
       const storyObj = store.getStoryObject(story);
       if (!storyObj) return err(storyNotFoundMsg(story, store));
+      const passages = storyObj.passages as Passage[];
       const applied: string[] = [];
-      const failed: string[] = [];
+      const failed: ToolError[] = [];
 
       for (const u of updates) {
         const p = storyObj.getPassageByName(u.passage) as
-          | import('extwee').Passage | undefined;
-        if (!p) { failed.push(u.passage); continue; }
+          | Passage
+          | undefined;
+        if (!p) {
+          failed.push(passageNotFoundMsg(u.passage, story, passages));
+          continue;
+        }
         if (u.text !== undefined) p.text = u.text;
         if (u.tags !== undefined) p.tags = u.tags;
         if (u.position !== undefined) {
@@ -160,6 +172,15 @@ export function registerUtilityTools(
       }
 
       if (applied.length > 0) store.saveStory(storyObj);
+      if (applied.length === 0 && failed.length > 0) {
+        return err(failed.length === 1 ? failed[0] : {
+          error: 'PassageNotFound',
+          message: `${failed.length} passages do not exist.`,
+          suggestions: failed
+            .flatMap((item) => item.suggestions ?? [])
+            .slice(0, 5),
+        });
+      }
       return ok({ applied, failed });
     },
   );

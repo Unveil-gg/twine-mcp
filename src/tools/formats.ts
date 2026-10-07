@@ -11,6 +11,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { IStoryStore } from '../types.js';
 import { getSyntaxGuide } from '../util/format-hints.js';
 import { ok, err } from './stories.js';
+import { readOnly } from '../util/tool-annotations.js';
 
 /** Known built-in Twine formats with static metadata. */
 const BUILT_IN_FORMATS: Record<
@@ -94,6 +95,7 @@ export function registerFormatTools(
   server.registerTool(
     'list_story_formats',
     {
+      annotations: readOnly,
       description:
         'List all known Twine story formats (built-in and user-installed). ' +
         'Also shows which formats are currently used by stories in the library.',
@@ -126,6 +128,7 @@ export function registerFormatTools(
   server.registerTool(
     'get_format_info',
     {
+      annotations: readOnly,
       description:
         'Get information about a specific story format: description, docs URL, ' +
         'and which stories in the library use it.',
@@ -168,6 +171,7 @@ export function registerFormatTools(
   server.registerTool(
     'get_format_syntax_guide',
     {
+      annotations: readOnly,
       description:
         'Return a concise syntax reference for a story format. ' +
         'Covers variables, conditionals, links, macros/widgets.',

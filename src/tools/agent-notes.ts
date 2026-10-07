@@ -15,6 +15,7 @@ import * as z from 'zod/v4';
 import type { IStoryStore } from '../types.js';
 import { ok, err } from './stories.js';
 import { storyNotFoundMsg } from '../util/errors.js';
+import { mutating, readOnly } from '../util/tool-annotations.js';
 
 const NOTES_FILENAME = '.agent-notes.md';
 
@@ -41,6 +42,7 @@ export function registerAgentNotesTools(
   server.registerTool(
     'get_agent_notes',
     {
+      annotations: readOnly,
       description:
         'Read the persistent agent working notes for a story. Notes ' +
         'are stored in .agent-notes.md at the project root and survive ' +
@@ -73,6 +75,7 @@ export function registerAgentNotesTools(
   server.registerTool(
     'update_agent_notes',
     {
+      annotations: mutating,
       description:
         'Write or replace the agent working notes for a story. Notes ' +
         'are stored in .agent-notes.md in the project root and persist ' +

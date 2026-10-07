@@ -11,6 +11,7 @@ import { buildLinkGraph } from '../story-store.js';
 import { findCycles, reachableFrom } from '../util/graph-algos.js';
 import { ok, err } from './stories.js';
 import { storyNotFoundMsg } from '../util/errors.js';
+import { readOnly } from '../util/tool-annotations.js';
 import type { AnalysisReport, BrokenLink } from '../types.js';
 
 /**
@@ -28,6 +29,7 @@ export function registerAnalysisTools(
   server.registerTool(
     'analyze_story',
     {
+      annotations: readOnly,
       description:
         'Run a comprehensive structural analysis of a story. ' +
         'Returns broken links, dead ends, orphans, unreachable passages, ' +
@@ -117,6 +119,7 @@ export function registerAnalysisTools(
   server.registerTool(
     'get_story_stats',
     {
+      annotations: readOnly,
       description:
         'Get word count, passage count, reading time estimate, ' +
         'and tag usage breakdown for a story.',
@@ -166,6 +169,7 @@ export function registerAnalysisTools(
   server.registerTool(
     'search_passages',
     {
+      annotations: readOnly,
       description:
         'Search passage text and/or names across a story. ' +
         'Returns matching passages with their name, tags, and a preview.',

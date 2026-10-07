@@ -10,6 +10,7 @@ import type { IStoryStore } from '../types.js';
 import { getFormatHints } from '../util/format-hints.js';
 import { ok, err } from './stories.js';
 import { storyNotFoundMsg } from '../util/errors.js';
+import { readOnly } from '../util/tool-annotations.js';
 import type { VarUsage } from '../types.js';
 
 /**
@@ -26,6 +27,7 @@ export function registerAnalysisVarTools(
   server.registerTool(
     'find_variable_usage',
     {
+      annotations: readOnly,
       description:
         'Scan passage text for variable set and read operations using ' +
         'format-aware patterns (SugarCube, Harlowe, Chapbook). ' +
@@ -97,6 +99,7 @@ export function registerAnalysisVarTools(
   server.registerTool(
     'check_tag_consistency',
     {
+      annotations: readOnly,
       description:
         'Audit tag usage across the story. ' +
         'Reports rare tags (used < 2 times) and passages with many tags.',

@@ -22,6 +22,7 @@ import { Passage } from 'extwee';
 import type { IStoryStore } from '../types.js';
 import { ok, err } from './stories.js';
 import { storyNotFoundMsg } from '../util/errors.js';
+import { mutating, readOnly } from '../util/tool-annotations.js';
 import { getStylesheetPassage } from '../util/format-hints.js';
 import type { PassageFull } from '../types.js';
 
@@ -58,6 +59,7 @@ export function registerCssTools(
   server.registerTool(
     'get_stylesheet',
     {
+      annotations: readOnly,
       description:
         'Read the CSS stylesheet for a story. Returns the passage ' +
         'name, current CSS content, and which format convention is ' +
@@ -98,6 +100,7 @@ export function registerCssTools(
   server.registerTool(
     'update_stylesheet',
     {
+      annotations: mutating,
       description:
         'Write CSS to the story stylesheet. Creates the passage if ' +
         'it does not exist. Use mode "replace" (default) to overwrite, ' +

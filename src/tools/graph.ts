@@ -14,6 +14,7 @@ import {
 } from '../util/graph-algos.js';
 import { ok, err } from './stories.js';
 import { storyNotFoundMsg, passageNotFoundMsg } from '../util/errors.js';
+import { readOnly } from '../util/tool-annotations.js';
 
 /**
  * Registers all graph analysis tools on the MCP server.
@@ -29,19 +30,20 @@ export function registerGraphTools(
   server.registerTool(
     'get_link_graph',
     {
+      annotations: readOnly,
       description:
-        'Return the full directed passage link graph as an adjacency list ' +
-        '(passage name → array of linked passage names). ' +
-        'Set compact=true to get only passage names with outgoing link counts.',
+        'Passage link index. Default is compact counts ' +
+        '(name, outCount, inCount). Set compact=false for the ' +
+        'adjacency list of passage names.',
       inputSchema: {
         story: z.string().describe('Story name'),
         compact: z
           .boolean()
           .optional()
-          .default(false)
+          .default(true)
           .describe(
-            'When true, returns {name, outCount, inCount} per passage ' +
-            'instead of full adjacency list',
+            'When true (default), returns {name, outCount, inCount}. ' +
+            'When false, returns the adjacency list.',
           ),
       },
     },
@@ -74,6 +76,7 @@ export function registerGraphTools(
   server.registerTool(
     'find_broken_links',
     {
+      annotations: readOnly,
       description:
         'Find all [[links]] in the story that point to passages that ' +
         'do not exist. Returns {from, target} pairs.',
@@ -98,6 +101,7 @@ export function registerGraphTools(
   server.registerTool(
     'find_dead_ends',
     {
+      annotations: readOnly,
       description:
         'Find passages with no outgoing links that are not tagged "ending". ' +
         'These may be unfinished branches.',
@@ -130,6 +134,7 @@ export function registerGraphTools(
   server.registerTool(
     'find_orphans',
     {
+      annotations: readOnly,
       description:
         'Find passages that no other passage links to (orphans). ' +
         'These cannot be reached during play unless they are the start.',
@@ -157,6 +162,7 @@ export function registerGraphTools(
   server.registerTool(
     'find_cycles',
     {
+      annotations: readOnly,
       description:
         'Detect circular link paths in the story. ' +
         'Loops are normal in many stories — use this to audit them.',
@@ -177,6 +183,7 @@ export function registerGraphTools(
   server.registerTool(
     'get_passage_path',
     {
+      annotations: readOnly,
       description:
         'Find the shortest passage path between two passages (BFS). ' +
         'Returns null if unreachable.',
@@ -190,6 +197,12 @@ export function registerGraphTools(
       const full = store.getStoryFull(story);
       if (!full) return err(storyNotFoundMsg(story, store));
       const graph = buildLinkGraph(full);
+      if (!full.passages.some((p) => p.name === from)) {
+        return err(passageNotFoundMsg(from, story, full.passages));
+      }
+      if (!full.passages.some((p) => p.name === to)) {
+        return err(passageNotFoundMsg(to, story, full.passages));
+      }
       const path = shortestPath(graph, from, to);
       return ok({ from, to, path, length: path ? path.length - 1 : null });
     },
@@ -199,6 +212,7 @@ export function registerGraphTools(
   server.registerTool(
     'get_reachable_passages',
     {
+      annotations: readOnly,
       description:
         'Return all passage names reachable from the start passage ' +
         '(or a given passage). Also returns unreachable passages.',

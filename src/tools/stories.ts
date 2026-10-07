@@ -3,10 +3,26 @@
  * Registered onto McpServer in server.ts.
  */
 
+import fs from 'fs';
+import path from 'path';
 import * as z from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { IStoryStore } from '../types.js';
+import type { ToolError } from '../util/errors.js';
 import { storyNotFoundMsg } from '../util/errors.js';
+import { storyMetaOf } from '../util/passage-view.js';
+import {
+  destructive,
+  mutating,
+  readOnly,
+} from '../util/tool-annotations.js';
+
+const STORY_FORMATS = [
+  'Harlowe',
+  'SugarCube',
+  'Chapbook',
+  'Snowman',
+] as const;
 
 /**
  * Registers all story-management tools on the MCP server.
@@ -22,10 +38,9 @@ export function registerStoryTools(
   server.registerTool(
     'list_stories',
     {
+      annotations: readOnly,
       description:
-        'List all Twine game projects discovered in the workspace. ' +
-        'Use this to understand what stories exist — helpful for ' +
-        'disambiguation when the user has multiple games. ' +
+        'List Twine projects in the workspace. ' +
         'Use fields to limit output size.',
       inputSchema: {
         fields: z
@@ -62,43 +77,35 @@ export function registerStoryTools(
   server.registerTool(
     'get_story',
     {
+      annotations: readOnly,
       description:
-        'Get full details for a story, optionally including passage list.',
+        'Story metadata only. Set include_passages for a title index ' +
+        '(name, tags, wordCount). Passage text is get_passage. ' +
+        'The manifest resource is twine://stories/{name}/manifest.',
       inputSchema: {
         name: z.string().describe('Story name'),
         include_passages: z
           .boolean()
           .optional()
           .default(false)
-          .describe('Include passage list in response'),
-        compact: z
-          .boolean()
-          .optional()
-          .default(false)
           .describe(
-            'When true, passage list returns name + preview only (no full text)',
+            'Include {name, tags, wordCount} per passage. No text.',
           ),
       },
     },
-    async ({ name, include_passages, compact }) => {
+    async ({ name, include_passages }) => {
       const story = store.getStoryFull(name);
       if (!story) return err(storyNotFoundMsg(name, store));
-      if (!include_passages) {
-        const { passages: _, ...meta } = story;
-        return ok(meta);
-      }
-      if (compact) {
-        return ok({
-          ...story,
-          passages: story.passages.map((p) => ({
-            name: p.name,
-            tags: p.tags,
-            wordCount: p.wordCount,
-            preview: p.preview,
-          })),
-        });
-      }
-      return ok(story);
+      const meta = storyMetaOf(story);
+      if (!include_passages) return ok(meta);
+      return ok({
+        ...meta,
+        passages: story.passages.map((p) => ({
+          name: p.name,
+          tags: p.tags,
+          wordCount: p.wordCount,
+        })),
+      });
     },
   );
 
@@ -106,18 +113,17 @@ export function registerStoryTools(
   server.registerTool(
     'create_story',
     {
+      annotations: mutating,
       description:
         'Create a new Twine story with a Start passage. ' +
         'For a full project with src/ layout use create_project instead.',
       inputSchema: {
         name: z.string().describe('Story name'),
         format: z
-          .string()
+          .enum(STORY_FORMATS)
           .optional()
           .default('Harlowe')
-          .describe(
-            'Story format name (Harlowe, SugarCube, Chapbook, Snowman)',
-          ),
+          .describe('Story format'),
         format_version: z
           .string()
           .optional()
@@ -127,7 +133,7 @@ export function registerStoryTools(
     },
     async ({ name, format, format_version }) => {
       if (store.listStories().some((s) => s.name === name)) {
-        return err(`Story "${name}" already exists.`);
+        return err(`Story '${name}' already exists.`);
       }
       const meta = store.createStory(name, format, format_version);
       return ok(meta);
@@ -138,6 +144,7 @@ export function registerStoryTools(
   server.registerTool(
     'delete_story',
     {
+      annotations: destructive,
       description: 'Delete a story. This cannot be undone.',
       inputSchema: {
         name: z.string().describe('Story name to delete'),
@@ -154,34 +161,62 @@ export function registerStoryTools(
   server.registerTool(
     'export_twee',
     {
+      annotations: mutating,
       description:
-        'Export a story as Twee 3 source text. ' +
-        'Useful for reading all passage content or feeding into external tools.',
+        'Write the story to export/<story>.twee and return the path. ' +
+        'Does not return Twee source. Read passages with get_passage.',
       inputSchema: {
         name: z.string().describe('Story name'),
       },
     },
     async ({ name }) => {
       const storyObj = store.getStoryObject(name);
-      if (!storyObj) return err(storyNotFoundMsg(name, store));
-      return {
-        content: [{ type: 'text' as const, text: storyObj.toTwee() }],
-      };
+      const root = store.getProjectRoot?.(name) ?? null;
+      if (!storyObj || !root) return err(storyNotFoundMsg(name, store));
+      const twee = storyObj.toTwee();
+      const outputPath = tweeExportPath(root, name);
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+      fs.writeFileSync(outputPath, twee, 'utf-8');
+      return ok({
+        outputPath,
+        byteSize: Buffer.byteLength(twee, 'utf8'),
+        passageCount: storyObj.passages.length,
+      });
     },
   );
+}
+
+/**
+ * Path for a Twee export next to the project.
+ *
+ * @param root - Project directory
+ * @param name - Story name
+ * @returns Absolute .twee path under export/
+ */
+function tweeExportPath(root: string, name: string): string {
+  const safe = name.replace(/[<>:"/\\|?*]/g, '_').trim() || 'story';
+  return path.join(root, 'export', `${safe}.twee`);
 }
 
 /** Wrap a value as a successful MCP text response. */
 export function ok(data: unknown) {
   return {
-    content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
+    content: [{ type: 'text' as const, text: JSON.stringify(data) }],
   };
 }
 
-/** Wrap an error message as an MCP text response. */
-export function err(message: string) {
+/**
+ * Wrap a diagnostic as an MCP error response.
+ *
+ * @param message - Structured error, or a plain message
+ * @returns Tool result with isError set
+ */
+export function err(message: string | ToolError) {
+  const payload: ToolError = typeof message === 'string'
+    ? { error: 'Error', message }
+    : message;
   return {
-    content: [{ type: 'text' as const, text: `ERROR: ${message}` }],
-    isError: true,
+    content: [{ type: 'text' as const, text: JSON.stringify(payload) }],
+    isError: true as const,
   };
 }
