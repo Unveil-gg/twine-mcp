@@ -24,7 +24,7 @@ git commit -m "chore: bump version to 0.2.0"
 # 3. Tag (must match package.json with v prefix)
 git tag v0.2.0
 
-# 4. Push commit and tag — CI publishes to npm
+# 4. Push commit and tag — CI stages the release on npm
 git push
 git push origin v0.2.0
 ```
@@ -33,19 +33,27 @@ Pushing a `v*` tag triggers [`.github/workflows/publish.yml`](.github/workflows/
 
 1. Validates the tag matches `package.json`
 2. Runs `npm ci`, build, and tests
-3. Publishes to npm with the `NPM_TOKEN` secret
+3. Stages the release with `npm stage publish` and the `NPM_TOKEN` secret
 4. Opens a GitHub issue if anything fails
+
+Staging does not put the version on the registry. After the workflow succeeds, approve it with 2FA on the package's **Staged Packages** tab at npmjs.com, or locally:
+
+```bash
+npm stage list @unveil-gg/twine-mcp
+npm stage approve <stage-id>
+```
 
 npm does not allow republishing the same version. Every release needs a new version bump.
 
-### Manual publish (fallback)
+### Manual stage (fallback)
 
 If CI is unavailable:
 
 ```bash
 npm run build
 npm test
-npm publish --access public
+npm stage publish --access public
+npm stage approve <stage-id>
 ```
 
 ---
@@ -84,7 +92,7 @@ The publish workflow reads `secrets.NPM_TOKEN`. Add it at:
 **Repo → Settings → Secrets and variables → Actions → New repository secret**
 
 Name: `NPM_TOKEN`  
-Value: your npm granular access token (Automation or Publish type)
+Value: a granular access token for `@unveil-gg/twine-mcp` with **Read and write (stage only)**
 
 ---
 
@@ -99,7 +107,7 @@ npm run setup        # interactive setup wizard
 npm test             # vitest
 ```
 
-`prepublishOnly` runs `npm run build` automatically before `npm publish`.
+`prepublishOnly` runs `npm run build` automatically before `npm publish`. The publish workflow also builds before `npm stage publish`.
 
 ---
 
@@ -108,7 +116,7 @@ npm test             # vitest
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
 | `ci.yml` | Push/PR to `main` | Lint, build, and test; open issue on failure |
-| `publish.yml` | Push tag `v*` | Build, test, publish to npm; open issue on failure |
+| `publish.yml` | Push tag `v*` | Build, test, and stage on npm; open issue on failure |
 
 ---
 

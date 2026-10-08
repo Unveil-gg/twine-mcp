@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   publish:
-    name: Build, test, and publish
+    name: Build, test, and stage
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -31,9 +31,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # npm stage requires Node >= 22.14 and npm CLI >= 11.15.
+          node-version: '22'
           registry-url: https://registry.npmjs.org
           cache: npm
+
+      - name: Install npm 11
+        run: npm install -g npm@11
 
       - name: Install dependencies
         run: npm ci
@@ -44,8 +48,16 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Publish to npm
-        run: npm publish --access public
+      - name: Stage release on npm
+        run: |
+          npm stage publish --access public
+          {
+            echo "### Staged, not published"
+            echo
+            echo "Approve @unveil-gg/twine-mcp on the Staged Packages"
+            echo "tab at npmjs.com. It is not installable until a"
+            echo "maintainer approves it with 2FA."
+          } >> "$GITHUB_STEP_SUMMARY"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -61,9 +73,9 @@ jobs:
           script: |
             const tag = context.ref.replace('refs/tags/', '');
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const title = `npm publish failed for ${tag}`;
+            const title = `npm stage failed for ${tag}`;
             const body = [
-              'The npm publish workflow failed.',
+              'The npm stage workflow failed. Nothing was published.',
               '',
               `- Tag: \`${tag}\``,
               `- Workflow run: ${runUrl}`,
@@ -71,9 +83,10 @@ jobs:
               '',
               'Check the workflow logs for details. Common causes:',
               '- Tag does not match \`package.json\` version',
-              '- Version already published to npm',
+              '- Version already published or already staged',
               '- Build or test failure',
               '- Invalid or expired \`NPM_TOKEN\` secret',
+              '- Token is not Read and write (stage only)',
             ].join('\n');
 
             await github.rest.issues.create({
